@@ -107,6 +107,7 @@ def decision_loss(
     score rows participate in both: CE over levels and BCE per level are
     averaged, matching the "every level judged alone" recipe.
     """
+    logits = logits.float()
     if logits.dim() == 3:
         if logits.size(1) != 1:
             raise ValueError(f"decision_loss expects Q=1, got Q={logits.size(1)}")

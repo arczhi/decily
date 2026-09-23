@@ -79,7 +79,10 @@ class CrossEncoderDecisionModel(nn.Module):
             nn.Dropout(cfg.dropout),
             nn.Linear(cfg.head_hidden_mult * d, 1),
         )
-        self.to(DTYPES.get(cfg.dtype, torch.float32))
+        # Trainable modules stay in fp32 (LoRA adapters + head); the frozen
+        # encoder holds the low-precision weights. Forward runs under autocast
+        # so matmuls use bf16 while optimizer states stay fp32 (AMP/QLoRA style).
+        self._compute_dtype = DTYPES.get(cfg.dtype, torch.float32)
 
     def _joint_inputs(
         self, batch: RouteBBatch
@@ -106,13 +109,19 @@ class CrossEncoderDecisionModel(nn.Module):
         return ids, mask, (b, q, k, ls + lq + lc)
 
     def forward(self, batch: RouteBBatch) -> dict[str, Tensor]:
-        ids, mask, (b, q, k, _) = self._joint_inputs(batch)
-        h = self.encoder(ids, mask)
-        if self.cfg.pool == "attention":
-            pooled = self.pool(h, mask)
-        elif self.cfg.pool == "cls":
-            pooled = h[:, 0]
-        else:
-            pooled = (h * mask.unsqueeze(-1)).sum(1) / mask.sum(1, keepdim=True).clamp(min=1)
-        logits = self.head(pooled).view(b, q, k)
-        return {"logits": logits, "pooled": pooled.view(b, q, k, -1), "batch": batch}
+        use_amp = self._compute_dtype != torch.float32 and torch.cuda.is_available()
+        with torch.autocast(
+            device_type="cuda", dtype=self._compute_dtype, enabled=use_amp
+        ):
+            ids, mask, (b, q, k, _) = self._joint_inputs(batch)
+            h = self.encoder(ids, mask)
+            if self.cfg.pool == "attention":
+                pooled = self.pool(h, mask)
+            elif self.cfg.pool == "cls":
+                pooled = h[:, 0]
+            else:
+                pooled = (h * mask.unsqueeze(-1)).sum(1) / mask.sum(
+                    1, keepdim=True
+                ).clamp(min=1)
+            logits = self.head(pooled).view(b, q, k)
+        return {"logits": logits.float(), "pooled": pooled.view(b, q, k, -1), "batch": batch}
