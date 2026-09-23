@@ -47,7 +47,8 @@ $PY scripts/convert_data.py --dataset arc_challenge --split validation --limit 2
 for s in high_school_world_history high_school_biology high_school_physics \
          high_school_government_and_politics college_computer_science \
          moral_scenarios professional_law world_religions; do
-  $PY scripts/convert_data.py --dataset mmlu_$s --split test --limit 100 --out data/raw/mmlu_${s}_val.jsonl
+  # eval must be disjoint from the training split (train shard used split=test)
+  $PY scripts/convert_data.py --dataset mmlu_$s --split validation --limit 100 --out data/raw/mmlu_${s}_val.jsonl
 done
 
 echo "=== mixed eval sets ==="

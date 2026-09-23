@@ -22,7 +22,12 @@ from transformers import AutoTokenizer  # noqa: E402
 
 from decision_model.data.collate import RouteACollator, RouteBCollator  # noqa: E402
 from decision_model.data.schema import read_jsonl  # noqa: E402
-from decision_model.eval.harness import evaluate, fit_temperature  # noqa: E402
+from decision_model.eval.harness import (  # noqa: E402
+    collect_logits,
+    fit_temperature_rows,
+    metrics_by_task,
+    metrics_from_rows,
+)
 
 
 def build_model(cfg: dict, ckpt_path: str | None):
@@ -85,24 +90,18 @@ def main() -> None:
     report = {}
     for path in args.eval:
         examples = list(read_jsonl(path))
-        m1 = evaluate(model, examples, coll, temperature=1.0, batch_size=args.batch_size, device=args.device)
-        row = {"n": len(examples), "T=1.0": m1}
-        if args.fit_temperature:
-            t, nll = fit_temperature(model, examples, coll, batch_size=args.batch_size, device=args.device)
-            m2 = evaluate(model, examples, coll, temperature=t, batch_size=args.batch_size, device=args.device)
-            row["fitted_T"] = t
-            row["fitted"] = m2
+        rows = collect_logits(
+            model, examples, coll, batch_size=args.batch_size, device=args.device
+        )
+        t_fit, _ = fit_temperature_rows(rows)
+        row = {
+            "n": float(len(rows)),
+            "fitted_T": t_fit,
+            "T=1.0": metrics_from_rows(rows, 1.0),
+            "fitted": metrics_from_rows(rows, t_fit),
+        }
         if args.per_task:
-            groups: dict[str, list] = {}
-            for ex in examples:
-                groups.setdefault(ex.task, []).append(ex)
-            row["per_task"] = {
-                task: evaluate(
-                    model, subset, coll, temperature=1.0,
-                    batch_size=args.batch_size, device=args.device,
-                )
-                for task, subset in sorted(groups.items())
-            }
+            row["per_task"] = metrics_by_task(rows, temperature=1.0)
         report[path] = row
         print(f"\n=== {path} (route {route}) ===")
         print(json.dumps(row, indent=2, ensure_ascii=False))

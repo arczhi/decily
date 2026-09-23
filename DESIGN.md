@@ -559,6 +559,36 @@ logits 与候选集无关，chunking 无损）→ Top-K → 相对 softmax。
 - 注：当前 chunk 实现逐块重编码，延迟更高；生产应做 prefix/KV 复用
   （cross-encoder 的 state+question 前缀可缓存）
 
+## 9.8 Stage 2b：24 任务混合（2026-09-23 完成）
+
+数据：24 任务（~75k 训练样本，含 8 个 MMLU 学科）；模型 Qwen3-0.6B-Base + LoRA
+（cross-encoder，可训 14.3M）；3000 步，有效 batch 16（micro 4 × accum 4），
+bf16 + 梯度检查点，状态截断 256。
+
+| 指标 | A（4 任务） | B（4 任务） | B（24 任务） |
+|---|---|---|---|
+| held-out acc | 0.385 | 0.491 | **0.542** |
+| held-out NLL（fitted） | 2.75 | 1.95 | **1.86** |
+| held-out ECE（fitted） | 0.138 | 0.129 | **0.107** |
+| held-out 拟合温度 | 1.70 | 0.50 | 0.40 |
+| in-task acc（各自评测集） | 0.888 | 0.881 | 0.850 |
+| in-task ECE | 0.023 | 0.020 | **0.017** |
+
+held-out 分任务（B4 → B24）：massive 0.588→0.573（略降）、banking77 0.370→0.432、
+emotion 0.512→0.620 → 混合广度主要增益在**大候选集（77 类）和细粒度情感**。
+
+结论：
+- **任务覆盖广度有效**：相对 B4，held-out acc +5.1pt / NLL −0.09 / ECE −0.022
+- B（24 任务）在 held-out 上全指标优于 Route A（acc +15.7pt，NLL −0.89，ECE −0.031）
+- 校准：held-out 需 T≈0.4（欠自信），in-task T≈1.0（已良好）→ Stage 2c 做
+  per-task-family 校准
+- massive 未提升：与训练任务分布差异大（语音助手话语），且 scenario 任务因与
+  held-out intent 同源被刻意排除
+
+评测卫生修复：
+- MMLU 训练用 test 划分、评测改用 validation（消除重叠）；温度网格下限 0.5→0.2
+- 评测改为单遍收集 logits、任意温度复用（原实现每文件 3 遍 forward）
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
