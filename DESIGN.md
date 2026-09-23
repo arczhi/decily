@@ -589,6 +589,24 @@ emotion 0.512→0.620 → 混合广度主要增益在**大候选集（77 类）�
 - MMLU 训练用 test 划分、评测改用 validation（消除重叠）；温度网格下限 0.5→0.2
 - 评测改为单遍收集 logits、任意温度复用（原实现每文件 3 遍 forward）
 
+## 9.9 Stage 2c：训练配方对照（2026-09-23 完成）
+
+两个配方变体，其余与 s2b 相同（24 任务、Qwen3-0.6B + LoRA、3000 步）：
+
+| held-out | B(4任务) | B(24任务) | B_normk | **B_bigk** |
+|---|---|---|---|---|
+| acc | 0.491 | 0.542 | 0.487 | 0.538 |
+| NLL | 1.95 | 1.86 | 1.86 | **1.60** |
+| ECE | 0.129 | 0.107 | 0.065 | **0.071** |
+
+- **bigk（max_options 10→16 + length_bucket）采纳**：精度持平但 NLL/ECE 显著更好；
+  banking77（77 类）0.432→**0.517**（+8.5pt）→ 训练候选集大小直接决定大候选集泛化；
+  代价：emotion 0.620→0.525（能力再分配）
+- **normk（按 log K 归一化损失）不采纳为主配方**：held-out acc −5.5pt
+  （banking77 崩到 0.278），但校准最好（ECE 0.065）→ 留作 Stage 3 的
+  "校准微调"候选手段
+- 结论：Stage 3（2B 放大）采用 bigk 配方；配比实验（任务权重）留待 Stage 2d/3
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
