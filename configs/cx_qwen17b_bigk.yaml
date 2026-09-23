@@ -1,7 +1,7 @@
 seed: 0
 model:
   route: cx
-  backbone: Qwen/Qwen3-1.7B-Base
+  backbone: /root/models/Qwen3-1.7B-Base  # pre-downloaded via aria2c (16 conns)
   freeze_backbone: true
   dtype: bfloat16
   lora: true
