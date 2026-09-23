@@ -628,6 +628,35 @@ bigk 配方不变，底座 0.6B → 1.7B（LoRA 34.2M 可训），3000 步。
   **LoRA/head 保持 fp32 + forward autocast**（AMP/QLoRA 标准做法），lr 2e-4→1e-4
 - 镜像单连接限速 2MB/s → **aria2c 16 连接 ~10-80MB/s**，3.4GB 模型 5 分钟下完
 
+## 9.11 Stage 4：RLCD 校准（2026-09-23 完成）
+
+基于 Stage 3（1.7B）checkpoint，800 步，belief:decision 数据比 0.4:0.6。
+损失 = belief log-score（软目标，已知概率律）+ REINFORCE action（硬标签，
+reward=正确性，baseline=模型自身概率）+ KL(策略‖参考策略, w=0.1)。
+
+数据：合成 belief 任务 6 类（硬币/骰子/纸牌/摸球/多骰和），2 万训练 +
+1 千评测（同模板、未见参数）。
+
+| 指标 | SFT 1.7B | **RLCD 1.7B** |
+|---|---|---|
+| held-out acc | 0.565 | **0.574** |
+| held-out NLL | 1.56 | **1.55** |
+| held-out ECE（T=1） | 0.280 | **0.124** |
+| held-out ECE（调温后） | **0.094** | 0.111 |
+| in-task acc | 0.854 | 0.854 |
+| in-task ECE（T=1） | **0.027** | 0.087 |
+| belief excess_nats | — | **0.0019**（decider v10: 0.22） |
+| belief_ece | — | **0.0048** |
+
+结论：
+- **belief 目标完全生效**：已知概率律任务上 excess 0.0019 nats（接近完美）
+- **held-out 上 T=1 的校准大幅改善**（ECE 0.280→0.124），说明模型学会"诚实报概率"；
+  acc/NLL 也小幅提升
+- **代价**：in-task 校准被扰动（0.027→0.087），调温后 held-out ECE 略差于 SFT
+  （0.111 vs 0.094）→ 说明 belief 训练整体压低了置信度，而 SFT 可被温度拟合"救回"
+- 下一步（RLCD v2）：降低 belief 比例（0.4→0.2）、提高 KL 权重、或按任务族
+  分别拟合温度；更理想的 belief 数据应贴近真实决策分布（不只是合成律）
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
