@@ -20,6 +20,7 @@ from transformers import AutoTokenizer  # noqa: E402
 from decision_model.data.collate import RouteBCollator  # noqa: E402
 from decision_model.data.mixture import MixtureItem, MixtureSampler  # noqa: E402
 from decision_model.data.schema import read_jsonl  # noqa: E402
+from decision_model.data.transforms import add_abstention  # noqa: E402
 from decision_model.eval.belief import evaluate_belief  # noqa: E402
 from decision_model.eval.harness import collect_logits, fit_temperature_rows, metrics_from_rows  # noqa: E402
 from decision_model.models.cross_encoder import (  # noqa: E402
@@ -102,6 +103,53 @@ def main() -> None:
         model, collator, belief_eval_examples,
         batch_size=rcfg.eval_batch_size, device=rcfg.device,
     )
+
+    # practical open-set checks: abstention when gold is absent / false abstention
+    import random as _random
+
+    heldout_examples = list(read_jsonl(cfg["data"]["heldout_path"]))
+    rng = _random.Random(0)
+    absent = [add_abstention(ex, rng, 1.0, mode="drop_gold", shuffle=False) for ex in heldout_examples]
+    present = [add_abstention(ex, rng, 1.0, mode="keep_gold", shuffle=False) for ex in heldout_examples]
+    absent_rows = collect_logits(
+        model, absent, collator, batch_size=rcfg.eval_batch_size,
+        device=rcfg.device, max_batches=rcfg.eval_max_batches,
+    )
+    present_rows = collect_logits(
+        model, present, collator, batch_size=rcfg.eval_batch_size,
+        device=rcfg.device, max_batches=rcfg.eval_max_batches,
+    )
+    import numpy as _np
+
+    def _abstain_rate(rows) -> float:
+        hits = 0
+        for lg in rows.logits:
+            if int(_np.argmax(lg)) == len(lg) - 1:
+                hits += 1
+        return hits / max(len(rows), 1)
+
+    report["abstention"] = {
+        "gold_absent_correct_rate": float(metrics_from_rows(absent_rows, 1.0).get("acc_all", 0.0)),
+        "gold_present_false_abstain_rate": _abstain_rate(present_rows),
+        "gold_present_acc_with_none": float(metrics_from_rows(present_rows, 1.0).get("acc_all", 0.0)),
+    }
+
+    # per-task-family temperatures (practical calibration)
+    from decision_model.eval.harness import fit_temperature_rows as _fit
+
+    per_task_T = {}
+    for task in sorted(set(rows.tasks)):
+        idx = [i for i, t in enumerate(rows.tasks) if t == task]
+        if len(idx) < 20:
+            continue
+        sub = type(rows)(
+            [rows.logits[i] for i in idx], [rows.valid[i] for i in idx],
+            [rows.targets[i] for i in idx], [rows.types[i] for i in idx],
+            [rows.tasks[i] for i in idx],
+        )
+        t_task, _ = _fit(sub)
+        per_task_T[task] = t_task
+    report["per_task_temperature"] = per_task_T
     out = os.path.join(rcfg.out_dir, "eval_report.json")
     with open(out, "w") as f:
         json.dump(report, f, indent=2)

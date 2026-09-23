@@ -27,6 +27,7 @@ from torch.optim import AdamW
 
 from ..data.mixture import MixtureSampler
 from ..data.schema import DecisionExample
+from ..data.transforms import add_abstention
 from ..eval.belief import evaluate_belief
 from ..eval.harness import evaluate
 
@@ -46,6 +47,7 @@ class RLCDConfig:
     kl_weight: float = 0.1
     kl_temperature: float = 1.0
     belief_ratio: float = 0.4
+    abstention_ratio: float = 0.0
     log_every: int = 25
     eval_every: int = 200
     eval_batch_size: int = 16
@@ -166,7 +168,10 @@ class RLCDTrainer:
                 if rng.random() < cfg.belief_ratio:
                     batch.append(belief_pool[rng.randrange(len(belief_pool))])
                 else:
-                    batch.append(next(stream))
+                    ex = next(stream)
+                    if cfg.abstention_ratio > 0:
+                        ex = add_abstention(ex, rng, cfg.abstention_ratio)
+                    batch.append(ex)
             yield batch
 
     def _save(self, step: int, tag: str) -> str:
