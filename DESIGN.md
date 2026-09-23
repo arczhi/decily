@@ -607,6 +607,27 @@ emotion 0.512→0.620 → 混合广度主要增益在**大候选集（77 类）�
   "校准微调"候选手段
 - 结论：Stage 3（2B 放大）采用 bigk 配方；配比实验（任务权重）留待 Stage 2d/3
 
+## 9.10 Stage 3：规模放大到 Qwen3-1.7B（2026-09-23 完成）
+
+bigk 配方不变，底座 0.6B → 1.7B（LoRA 34.2M 可训），3000 步。
+
+| 指标 | B_bigk 0.6B | **B_bigk 1.7B** |
+|---|---|---|
+| held-out acc | 0.538 | **0.565**（+2.7pt） |
+| held-out NLL | 1.60 | **1.56** |
+| held-out ECE | **0.071** | 0.094（变差） |
+| in-task acc | 0.823 | **0.854**（+3.1pt） |
+| in-task ECE | 0.025 | 0.025 |
+
+- held-out 三任务全涨：massive 0.573→0.585、banking77 0.517→0.525、emotion 0.525→0.585
+- in-task 提升面广：arc_easy 0.776→0.876、arc_challenge 0.636→0.748、mmlu 各科 +0.2~0.35
+- **规模杠杆成立，但 held-out 校准退化（0.071→0.094）** → 下一步 RLCD 的核心目标
+
+工程记录（踩坑）：
+- 1.7B 纯 bf16 训练在 step ~400 发散（grad_norm 502）→ 修复：底座 bf16 +
+  **LoRA/head 保持 fp32 + forward autocast**（AMP/QLoRA 标准做法），lr 2e-4→1e-4
+- 镜像单连接限速 2MB/s → **aria2c 16 连接 ~10-80MB/s**，3.4GB 模型 5 分钟下完
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward

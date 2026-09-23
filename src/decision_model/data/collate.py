@@ -42,6 +42,8 @@ class RouteBBatch:
     task_type: Tensor
     tasks: list[str]
     task_types: list[str]
+    soft_targets: Tensor | None = None
+    has_soft: Tensor | None = None
 
 
 class RouteBCollator:
@@ -80,6 +82,8 @@ class RouteBCollator:
         answer_index = torch.full((b, q), -1, dtype=torch.long)
         task_type = torch.zeros(b, dtype=torch.long)
         task_types: list[str] = []
+        soft_targets = torch.zeros((b, q, k), dtype=torch.float)
+        has_soft = torch.zeros(b, dtype=torch.bool)
 
         for i, qs in enumerate(questions):
             task_type[i] = TASK_TYPE_IDS[qs[0].type]
@@ -99,6 +103,10 @@ class RouteBCollator:
                             answer_mask[i, j, m] = 1.0
                             if question.type in ("choice", "score") and len(gold) == 1:
                                 answer_index[i, j] = m
+                    if question.probs is not None:
+                        has_soft[i] = True
+                        for m, pv in enumerate(question.probs):
+                            soft_targets[i, j, m] = float(pv)
                 else:
                     row_q.append(self._enc("", self.max_question_tokens))
                     row_o.append([])
@@ -134,6 +142,8 @@ class RouteBCollator:
             task_type=task_type,
             tasks=[ex.task for ex in examples],
             task_types=task_types,
+            soft_targets=soft_targets,
+            has_soft=has_soft,
         )
 
 

@@ -36,6 +36,7 @@ class Question:
     answer_ids: list[str]
     text: str = ""
     type: TaskType = "choice"
+    probs: list[float] | None = None  # soft targets (belief tasks), aligned with options
 
     def option_ids(self) -> list[str]:
         return [o.id for o in self.options]
@@ -74,6 +75,7 @@ class DecisionExample:
                     answer_ids=list(q["answer_ids"]),
                     text=q.get("text", ""),
                     type=q.get("type", "choice"),
+                    probs=q.get("probs"),
                 )
             )
         return cls(
@@ -114,6 +116,13 @@ def validate(example: DecisionExample) -> list[str]:
             errors.append(f"{tag}: {q.type} expects exactly one answer")
         if q.type == "noul" and len(q.options) < 2:
             errors.append(f"{tag}: noul needs at least 2 options")
+        if q.probs is not None:
+            if len(q.probs) != len(q.options):
+                errors.append(f"{tag}: probs length != options")
+            elif abs(sum(q.probs) - 1.0) > 1e-3:
+                errors.append(f"{tag}: probs must sum to 1 (got {sum(q.probs):.3f})")
+            elif any(p < 0 for p in q.probs):
+                errors.append(f"{tag}: negative prob")
     return errors
 
 
