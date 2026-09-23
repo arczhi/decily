@@ -6,7 +6,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOST="${HOST:-decision-gpu}"
 REMOTE_DIR="${REMOTE_DIR:-/root/decision-model}"
-REMOTE_LOG="${REMOTE_LOG:-/root/queue.log}"
+REMOTE_LOG="${REMOTE_LOG:-/root/queue2.log}"
 DONE_MARK="${DONE_MARK:-QUEUE_DONE}"
 RUNS="rlcd_v3b_noaction rlcd_v3c_abs35 rlcd_v3d_logonly"
 ALL_RUNS="rlcd_v3_17b rlcd_v3b_noaction rlcd_v3c_abs35 rlcd_v3d_logonly"
