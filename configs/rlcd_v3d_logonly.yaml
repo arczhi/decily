@@ -98,13 +98,13 @@ data:
     path: data/raw/mmlu_world_religions_train.jsonl
     weight: 0.5
 rlcd:
-  steps: 1000
+  steps: 500
   batch_size: 4
   grad_accum: 4
   lr: 2.0e-05
   weight_decay: 0.0
   grad_clip: 1.0
-  warmup_steps: 50
+  warmup_steps: 25
   scheduler: cosine
   belief_weight: 1.0
   action_weight: 0.3
