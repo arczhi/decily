@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+runs/
+runs_remote/
+logs/
+data/raw/
+data/eval/
+*.pt
+*.log
+.DS_Store

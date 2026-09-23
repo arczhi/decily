@@ -1,0 +1,65 @@
+seed: 0
+model:
+  route: cx
+  backbone: Qwen/Qwen3-0.6B-Base
+  freeze_backbone: true
+  dtype: bfloat16
+  lora: true
+  lora_r: 16
+  lora_alpha: 32
+  pool: attention
+  dropout: 0.0
+  label_smoothing: 0.05
+  attn_implementation: sdpa
+  grad_checkpointing: true
+data:
+  collator:
+    max_state_tokens: 256
+    max_question_tokens: 96
+    max_option_tokens: 64
+  min_options: 2
+  max_options: 10
+  eval_path: data/eval/stage2_intask.jsonl
+  probe_path: data/raw/sst2_train.jsonl
+  manifest:
+    - {task: sst2, path: data/raw/sst2_train.jsonl, weight: 1.0}
+    - {task: ag_news, path: data/raw/ag_news_train.jsonl, weight: 1.0}
+    - {task: mnli, path: data/raw/mnli_train.jsonl, weight: 1.0}
+    - {task: arc_easy, path: data/raw/arc_easy_train.jsonl, weight: 1.0}
+    - {task: amazon_polarity, path: data/raw/amazon_polarity_train.jsonl, weight: 1.0}
+    - {task: imdb, path: data/raw/imdb_train.jsonl, weight: 1.0}
+    - {task: tweet_sentiment, path: data/raw/tweet_sentiment_train.jsonl, weight: 1.0}
+    - {task: toxic_conversations, path: data/raw/toxic_conversations_train.jsonl, weight: 1.0}
+    - {task: counterfactual, path: data/raw/counterfactual_train.jsonl, weight: 1.0}
+    - {task: tweet_topic, path: data/raw/tweet_topic_train.jsonl, weight: 1.0}
+    - {task: poem_sentiment, path: data/raw/poem_sentiment_train.jsonl, weight: 1.0}
+    - {task: dbpedia, path: data/raw/dbpedia_train.jsonl, weight: 1.0}
+    - {task: rte, path: data/raw/rte_train.jsonl, weight: 1.0}
+    - {task: qqp, path: data/raw/qqp_train.jsonl, weight: 1.0}
+    - {task: mrpc, path: data/raw/mrpc_train.jsonl, weight: 1.0}
+    - {task: arc_challenge, path: data/raw/arc_challenge_train.jsonl, weight: 1.0}
+    - {task: mmlu_high_school_world_history, path: data/raw/mmlu_high_school_world_history_train.jsonl, weight: 0.5}
+    - {task: mmlu_high_school_biology, path: data/raw/mmlu_high_school_biology_train.jsonl, weight: 0.5}
+    - {task: mmlu_high_school_physics, path: data/raw/mmlu_high_school_physics_train.jsonl, weight: 0.5}
+    - {task: mmlu_high_school_government_and_politics, path: data/raw/mmlu_high_school_government_and_politics_train.jsonl, weight: 0.5}
+    - {task: mmlu_college_computer_science, path: data/raw/mmlu_college_computer_science_train.jsonl, weight: 0.5}
+    - {task: mmlu_moral_scenarios, path: data/raw/mmlu_moral_scenarios_train.jsonl, weight: 0.5}
+    - {task: mmlu_professional_law, path: data/raw/mmlu_professional_law_train.jsonl, weight: 0.5}
+    - {task: mmlu_world_religions, path: data/raw/mmlu_world_religions_train.jsonl, weight: 0.5}
+train:
+  steps: 3000
+  batch_size: 4
+  lr: 0.0002
+  weight_decay: 0.01
+  grad_clip: 1.0
+  grad_accum: 4
+  warmup_steps: 100
+  scheduler: cosine
+  log_every: 100
+  eval_every: 1000
+  eval_batch_size: 16
+  eval_max_batches: 100
+  out_dir: runs/cx_qwen_s2b
+  seed: 0
+  device: cuda
+  label_smoothing: 0.05

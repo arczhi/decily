@@ -1,0 +1,36 @@
+seed: 0
+model:
+  route: b
+  backbone: answerdotai/ModernBERT-base
+  freeze_backbone: true
+  scorer_layers: 3
+  scorer_heads: 8
+  dot_feature: true
+  center_pooled: true
+  label_smoothing: 0.05
+data:
+  collator:
+    max_state_tokens: 2048
+    max_question_tokens: 96
+    max_option_tokens: 64
+  min_options: 2
+  max_options: 10
+  eval_path: data/eval/stage1_intask.jsonl
+  probe_path: data/raw/sst2_train.jsonl
+  manifest:
+    - {task: sst2, path: data/raw/sst2_train.jsonl, weight: 1.0}
+    - {task: ag_news, path: data/raw/ag_news_train.jsonl, weight: 1.0}
+    - {task: mnli, path: data/raw/mnli_train.jsonl, weight: 1.0}
+    - {task: arc_easy, path: data/raw/arc_easy_train.jsonl, weight: 1.0}
+train:
+  steps: 200
+  batch_size: 16
+  lr: 0.001
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 10
+  eval_every: 0
+  out_dir: runs/diag_b4
+  seed: 0
+  device: cuda
+  label_smoothing: 0.05

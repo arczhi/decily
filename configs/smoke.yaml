@@ -1,0 +1,35 @@
+seed: 0
+model:
+  route: b
+  backbone: answerdotai/ModernBERT-base
+  freeze_backbone: true
+  scorer_layers: 2
+  scorer_heads: 8
+  dot_feature: true
+  label_smoothing: 0.05
+data:
+  collator:
+    max_state_tokens: 512
+    max_question_tokens: 64
+    max_option_tokens: 48
+  min_options: 2
+  max_options: 10
+  eval_path: data/eval/smoke_eval.jsonl
+  probe_path: data/raw/sst2_train.jsonl
+  manifest:
+    - {task: sst2, path: data/raw/sst2_train.jsonl, weight: 1.0}
+    - {task: ag_news, path: data/raw/ag_news_train.jsonl, weight: 1.0}
+train:
+  steps: 40
+  batch_size: 8
+  lr: 0.001
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 5
+  eval_every: 20
+  eval_batch_size: 32
+  eval_max_batches: 10
+  out_dir: runs/smoke_b
+  seed: 0
+  device: cuda
+  label_smoothing: 0.05
