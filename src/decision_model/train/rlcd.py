@@ -27,7 +27,7 @@ from torch.optim import AdamW
 
 from ..data.mixture import MixtureSampler
 from ..data.schema import DecisionExample
-from ..data.transforms import add_abstention
+from ..data.transforms import add_abstention, drop_gold
 from ..eval.belief import evaluate_belief
 from ..eval.harness import evaluate
 
@@ -45,6 +45,9 @@ class RLCDConfig:
     belief_weight: float = 1.0
     action_weight: float = 0.3
     kl_weight: float = 0.1
+    ce_weight: float = 1.0
+    spherical_weight: float = 0.75
+    brier_weight: float = 0.5
     kl_temperature: float = 1.0
     belief_ratio: float = 0.4
     abstention_ratio: float = 0.0
@@ -72,53 +75,103 @@ def _masked_log_softmax(logits: Tensor, valid: Tensor) -> Tensor:
 
 
 def rlcd_losses(
-    logits: Tensor,
-    ref_logits: Tensor,
+    out: dict,
+    ref_out: dict,
     batch,
     cfg: RLCDConfig,
 ) -> dict[str, Tensor]:
-    logits = logits.float()
+    """v3 losses: joint CE (candidates + reject class), belief proper score
+    (log + spherical), REINFORCE action with a Brier-shaped reward, KL anchor."""
+    logits = out["logits"].float()
     if logits.dim() == 3:
         logits = logits[:, 0]
-    ref_logits = ref_logits.float()
+    ref_logits = ref_out["logits"].float()
     if ref_logits.dim() == 3:
         ref_logits = ref_logits[:, 0]
+
     valid = batch.option_valid[:, 0]
+    defer = batch.defer.bool() if batch.defer is not None else torch.zeros_like(valid[:, 0])
     logp = _masked_log_softmax(logits, valid)
     probs = logp.exp()
 
     losses: dict[str, Tensor] = {}
     has_soft = batch.has_soft.bool()
 
+    # ---- joint CE over candidates (+ reject class when a rejector exists) ----
+    if cfg.ce_weight > 0:
+        reject_logit = out.get("reject_logit")
+        if reject_logit is not None:
+            reject_logit = reject_logit.float()
+            if reject_logit.dim() == 2:
+                reject_logit = reject_logit[:, 0]
+            full = torch.cat([logits, reject_logit.unsqueeze(-1)], dim=-1)
+            full_valid = torch.cat(
+                [valid, torch.ones_like(valid[:, :1])], dim=-1
+            )
+            k = full.size(-1)
+            target = torch.where(
+                defer,
+                torch.full_like(batch.answer_index[:, 0], k - 1),
+                batch.answer_index[:, 0].clamp(min=0),
+            )
+        else:
+            full, full_valid = logits, valid
+            k = full.size(-1)
+            target = batch.answer_index[:, 0].clamp(min=0)
+
+        row_mask = (~has_soft) & ((~defer) | (reject_logit is not None))
+        if row_mask.any():
+            lg = full[row_mask].masked_fill(~full_valid[row_mask], -1e9)
+            tgt = target[row_mask]
+            ls = cfg.label_smoothing if hasattr(cfg, "label_smoothing") else 0.0
+            smooth = torch.full_like(lg, ls / max(k - 1, 1))
+            smooth.scatter_(1, tgt.unsqueeze(1), 1.0 - ls)
+            smooth = smooth.masked_fill(~full_valid[row_mask], 0.0)
+            smooth = smooth / smooth.sum(-1, keepdim=True).clamp(min=1e-9)
+            losses["ce"] = -(smooth * F.log_softmax(lg, dim=-1)).sum(-1).mean()
+
+    # ---- belief: combined proper score (log + spherical) on soft targets ----
     if has_soft.any():
         soft = batch.soft_targets[:, 0][has_soft]
         soft = soft / soft.sum(-1, keepdim=True).clamp(min=1e-9)
-        losses["belief"] = -(soft * logp[has_soft]).sum(-1).mean()
+        p = probs[has_soft]
+        log_score = (soft * logp[has_soft]).sum(-1)
+        spherical = (soft * p).sum(-1) / p.norm(dim=-1).clamp(min=1e-9)
+        losses["belief"] = -(log_score + cfg.spherical_weight * spherical).mean()
 
+    # ---- action: REINFORCE with reward = correct + brier (RLCR-style) ----
     hard = ~has_soft
     if hard.any() and cfg.action_weight > 0:
         gold = batch.answer_index[:, 0][hard].clamp(min=0)
         p = probs[hard]
         dist = torch.distributions.Categorical(probs=p.clamp(min=1e-9))
         action = dist.sample()
-        reward = (action == gold).float()
-        baseline = p.gather(1, gold.unsqueeze(1)).squeeze(1).detach()
-        adv = (reward - baseline).detach()
-        logp_action = dist.log_prob(action)
-        losses["action"] = -(logp_action * adv).mean()
+        y = (action == gold).float()
+        q = p.gather(1, action.unsqueeze(1)).squeeze(1)
+        reward = y + cfg.brier_weight * (-((q - y) ** 2))
+        with torch.no_grad():
+            onehot = F.one_hot(gold, num_classes=p.size(-1)).float()
+            exp_reward = (
+                p * (onehot + cfg.brier_weight * (-((p - onehot) ** 2)))
+            ).sum(-1)
+        adv = (reward - exp_reward).detach()
+        losses["action"] = -(dist.log_prob(action) * adv).mean()
 
+    # ---- KL to reference policy ----
     if cfg.kl_weight > 0:
         ref_logp = _masked_log_softmax(ref_logits, valid)
         kl = (probs * (logp - ref_logp)).sum(-1)
         losses["kl"] = kl.mean()
 
     total = torch.zeros((), device=logits.device)
-    if "belief" in losses:
-        total = total + cfg.belief_weight * losses["belief"]
-    if "action" in losses:
-        total = total + cfg.action_weight * losses["action"]
-    if "kl" in losses:
-        total = total + cfg.kl_weight * losses["kl"]
+    for name, w in (
+        ("ce", cfg.ce_weight),
+        ("belief", cfg.belief_weight),
+        ("action", cfg.action_weight),
+        ("kl", cfg.kl_weight),
+    ):
+        if name in losses:
+            total = total + w * losses[name]
     losses["total"] = total
     return losses
 
@@ -169,8 +222,8 @@ class RLCDTrainer:
                     batch.append(belief_pool[rng.randrange(len(belief_pool))])
                 else:
                     ex = next(stream)
-                    if cfg.abstention_ratio > 0:
-                        ex = add_abstention(ex, rng, cfg.abstention_ratio)
+                    if cfg.abstention_ratio > 0 and rng.random() < cfg.abstention_ratio:
+                        ex = drop_gold(ex)
                     batch.append(ex)
             yield batch
 
@@ -212,7 +265,7 @@ class RLCDTrainer:
             out = self.model(batch)
             with torch.no_grad():
                 ref_out = self.ref(batch)
-            losses = rlcd_losses(out["logits"], ref_out["logits"], batch, cfg)
+            losses = rlcd_losses(out, ref_out, batch, cfg)
             (losses["total"] / cfg.grad_accum).backward()
             for k, v in losses.items():
                 running[k] = running.get(k, 0.0) + float(v.detach())

@@ -52,3 +52,23 @@ def add_abstention(
         probs=None,
     )
     return DecisionExample(task=example.task, state=example.state, questions=[new_q], meta=example.meta)
+
+
+def drop_gold(example: DecisionExample) -> DecisionExample:
+    """Remove the gold option and mark the question as defer (answer absent)."""
+    q = example.questions[0]
+    if q.defer or len(q.answer_ids) != 1:
+        return example
+    gold_id = q.answer_ids[0]
+    kept = [o for o in q.options if o.id != gold_id]
+    if len(kept) < 2:
+        return example
+    new_q = Question(
+        text=q.text,
+        options=kept,
+        answer_ids=[],
+        type=q.type,
+        probs=None,
+        defer=True,
+    )
+    return DecisionExample(task=example.task, state=example.state, questions=[new_q], meta=example.meta)

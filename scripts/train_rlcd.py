@@ -30,13 +30,58 @@ from decision_model.models.cross_encoder import (  # noqa: E402
 from decision_model.train.rlcd import RLCDConfig, RLCDTrainer  # noqa: E402
 
 
+
+def _collect_with_reject(model, collator, examples, batch_size=16, device="cuda", max_batches=None):
+    """Candidate logits + reject logit appended as the last class (v3)."""
+    import numpy as np
+
+    rows = []
+    chunk = []
+    n_batches = 0
+    with torch.no_grad():
+        for ex in examples:
+            chunk.append(ex)
+            if len(chunk) >= batch_size:
+                rows.extend(_flush_reject(model, collator, chunk, device))
+                chunk = []
+                n_batches += 1
+                if max_batches is not None and n_batches >= max_batches:
+                    break
+        if chunk and (max_batches is None or n_batches < max_batches):
+            rows.extend(_flush_reject(model, collator, chunk, device))
+    return rows
+
+
+def _flush_reject(model, collator, chunk, device):
+    import numpy as np
+
+    batch = collator(chunk)
+    for f in batch.__dataclass_fields__:
+        v = getattr(batch, f)
+        if isinstance(v, torch.Tensor):
+            setattr(batch, f, v.to(device))
+    out = model(batch)
+    logits = out["logits"][:, 0].float().cpu()
+    reject = out["reject_logit"][:, 0].float().cpu()
+    valid = batch.option_valid[:, 0].cpu()
+    rows = []
+    for i in range(len(chunk)):
+        cand = logits[i][valid[i]].numpy()
+        rows.append(np.concatenate([cand, reject[i].reshape(1).numpy()]))
+    return rows
+
+
 def build_model(model_cfg: dict, ckpt_path: str):
     cfg = {k: v for k, v in model_cfg.items() if k != "route"}
     model = CrossEncoderDecisionModel(CrossEncoderConfig(**cfg))
     ckpt = torch.load(ckpt_path, map_location="cpu")
     state = ckpt["state"] if isinstance(ckpt, dict) and "state" in ckpt else ckpt
     incompatible = model.load_state_dict(state, strict=False)
-    hard = [k for k in incompatible.missing_keys if "encoder.model" not in k]
+    allow_prefixes = ("encoder.model", "reject_head", "reject_pool")
+    hard = [
+        k for k in incompatible.missing_keys
+        if not k.startswith(allow_prefixes)
+    ]
     if hard:
         raise RuntimeError(f"checkpoint mismatch, missing: {hard[:5]}")
     return model
@@ -104,34 +149,38 @@ def main() -> None:
         batch_size=rcfg.eval_batch_size, device=rcfg.device,
     )
 
-    # practical open-set checks: abstention when gold is absent / false abstention
+    # practical open-set checks via the reject head (v3)
+    import numpy as _np
     import random as _random
 
+    from decision_model.data.transforms import drop_gold
+    from decision_model.infer.abstention import abstention_curve
+
     heldout_examples = list(read_jsonl(cfg["data"]["heldout_path"]))
-    rng = _random.Random(0)
-    absent = [add_abstention(ex, rng, 1.0, mode="drop_gold", shuffle=False) for ex in heldout_examples]
-    present = [add_abstention(ex, rng, 1.0, mode="keep_gold", shuffle=False) for ex in heldout_examples]
-    absent_rows = collect_logits(
-        model, absent, collator, batch_size=rcfg.eval_batch_size,
+    absent = [drop_gold(ex) for ex in heldout_examples if not ex.questions[0].defer]
+    present_rows = _collect_with_reject(
+        model, collator, heldout_examples, batch_size=rcfg.eval_batch_size,
         device=rcfg.device, max_batches=rcfg.eval_max_batches,
     )
-    present_rows = collect_logits(
-        model, present, collator, batch_size=rcfg.eval_batch_size,
+    absent_rows = _collect_with_reject(
+        model, collator, absent, batch_size=rcfg.eval_batch_size,
         device=rcfg.device, max_batches=rcfg.eval_max_batches,
     )
-    import numpy as _np
-
-    def _abstain_rate(rows) -> float:
-        hits = 0
-        for lg in rows.logits:
-            if int(_np.argmax(lg)) == len(lg) - 1:
-                hits += 1
-        return hits / max(len(rows), 1)
-
+    curve = abstention_curve(present_rows, absent_rows)
+    chosen = curve.pick(target_false=0.05)
     report["abstention"] = {
-        "gold_absent_correct_rate": float(metrics_from_rows(absent_rows, 1.0).get("acc_all", 0.0)),
-        "gold_present_false_abstain_rate": _abstain_rate(present_rows),
-        "gold_present_acc_with_none": float(metrics_from_rows(present_rows, 1.0).get("acc_all", 0.0)),
+        "chosen_5pct_budget": chosen,
+        "false_abstain_rate_at_0": float(
+            _np.mean([int(_np.argmax(lg)) == len(lg) - 1 for lg in present_rows])
+        ),
+        "correct_abstain_rate_at_0": float(
+            _np.mean([int(_np.argmax(lg)) == len(lg) - 1 for lg in absent_rows])
+        ),
+        "curve": {
+            "bias": curve.biases,
+            "correct": curve.correct_rates,
+            "false": curve.false_rates,
+        },
     }
 
     # per-task-family temperatures (practical calibration)

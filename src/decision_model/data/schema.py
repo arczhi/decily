@@ -37,6 +37,7 @@ class Question:
     text: str = ""
     type: TaskType = "choice"
     probs: list[float] | None = None  # soft targets (belief tasks), aligned with options
+    defer: bool = False  # true when the answer is absent from the option set
 
     def option_ids(self) -> list[str]:
         return [o.id for o in self.options]
@@ -76,6 +77,7 @@ class DecisionExample:
                     text=q.get("text", ""),
                     type=q.get("type", "choice"),
                     probs=q.get("probs"),
+                    defer=q.get("defer", False),
                 )
             )
         return cls(
@@ -107,12 +109,13 @@ def validate(example: DecisionExample) -> list[str]:
         ids = q.option_ids()
         if len(ids) != len(set(ids)):
             errors.append(f"{tag}: duplicate option ids")
-        if not q.answer_ids:
-            errors.append(f"{tag}: no answer")
-        for a in q.answer_ids:
-            if a not in ids:
-                errors.append(f"{tag}: answer {a!r} not in options")
-        if q.type in ("choice", "score") and len(q.answer_ids) != 1:
+        if not q.defer:
+            if not q.answer_ids:
+                errors.append(f"{tag}: no answer")
+            for a in q.answer_ids:
+                if a not in ids:
+                    errors.append(f"{tag}: answer {a!r} not in options")
+        if not q.defer and q.type in ("choice", "score") and len(q.answer_ids) != 1:
             errors.append(f"{tag}: {q.type} expects exactly one answer")
         if q.type == "noul" and len(q.options) < 2:
             errors.append(f"{tag}: noul needs at least 2 options")

@@ -39,6 +39,7 @@ class CrossEncoderConfig:
     n_task_types: int = 3
     attn_implementation: str = "sdpa"
     grad_checkpointing: bool = False
+    rejector: bool = False
 
 
 class CrossEncoderDecisionModel(nn.Module):
@@ -78,6 +79,17 @@ class CrossEncoderDecisionModel(nn.Module):
             nn.GELU(),
             nn.Dropout(cfg.dropout),
             nn.Linear(cfg.head_hidden_mult * d, 1),
+        )
+        self.reject_pool = AttentionPooling(d) if cfg.rejector else None
+        self.reject_head = (
+            nn.Sequential(
+                nn.LayerNorm(d),
+                nn.Linear(d, cfg.head_hidden_mult * d),
+                nn.GELU(),
+                nn.Linear(cfg.head_hidden_mult * d, 1),
+            )
+            if cfg.rejector
+            else None
         )
         # Trainable modules stay in fp32 (LoRA adapters + head); the frozen
         # encoder holds the low-precision weights. Forward runs under autocast
@@ -124,4 +136,14 @@ class CrossEncoderDecisionModel(nn.Module):
                     1, keepdim=True
                 ).clamp(min=1)
             logits = self.head(pooled).view(b, q, k)
-        return {"logits": logits.float(), "pooled": pooled.view(b, q, k, -1), "batch": batch}
+            reject_logit = None
+            if self.reject_head is not None:
+                cand_mask = batch.option_mask[:, :, :, 0]
+                set_repr = self.reject_pool(
+                    pooled.view(b * q, k, -1), cand_mask.reshape(b * q, k)
+                ).view(b, q, -1)
+                reject_logit = self.reject_head(set_repr).squeeze(-1)
+        out = {"logits": logits.float(), "pooled": pooled.view(b, q, k, -1), "batch": batch}
+        if reject_logit is not None:
+            out["reject_logit"] = reject_logit.float()
+        return out
