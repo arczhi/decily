@@ -769,6 +769,24 @@ v2/v3 的准确率达 97%/93%（SFT 仅 79%）。
 - 结论：**RLCD 的 belief 训练让选择性预测变得可用**（置信度排序质量是前提），
   阈值化本身不需要 rejector 头（v3 的 rejector 仅边际收益且损精度）
 
+## 9.16 RLCD v3 消融：有效成分与无效成分（2026-09-24）
+
+队列实验（均基于 SFT 1.7B，1000 步，rejector 头，held-out 调温后）：
+
+| 变体 | held-out acc | ECE | NLL | 弃权@5%预算(正确率) |
+|---|---|---|---|---|
+| v3（全量：CE+belief+action+KL） | 0.519 | **0.064** | **1.633** | 8.5% |
+| v3b（去掉 action RL） | 0.521 | 0.072 | 1.642 | 8.6% |
+| v3c（弃权训练 0.20→0.35） | 0.523 | 0.068 | 1.641 | 8.9% |
+| v3d（belief 去掉 spherical，500 步） | 待测 | | | |
+
+结论（与文献一致）：
+- **action RL（REINFORCE）几乎无贡献** → RLCR（二元 reward 的 RL 不改善校准）
+  与 decoding-jev（采样目标≠部署目标）在实测中复现；belief + CE 是有效成分
+- **提高弃权训练比例不能改善 rejector 区分度** → 再次验证 §9.15：
+  实用弃权应走"置信度阈值化 + 大校准集"，而非 rejector 头
+- spherical 项的作用待 v3d 结果（预期：加快 belief 收敛，对最终校准影响小）
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
