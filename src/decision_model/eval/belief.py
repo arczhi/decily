@@ -79,4 +79,14 @@ def evaluate_belief(
             flush(chunk)
             chunk = []
     flush(chunk)
-    return belief_scores(np.stack(preds), np.stack(trues))
+
+    # options counts differ across tasks (synthetic laws vs goemotions) -> pad
+    width = max(len(p) for p in preds)
+
+    def _pad(rows: list[np.ndarray]) -> np.ndarray:
+        out = np.zeros((len(rows), width), dtype=np.float64)
+        for i, r in enumerate(rows):
+            out[i, : len(r)] = r
+        return out
+
+    return belief_scores(_pad(preds), _pad(trues))
