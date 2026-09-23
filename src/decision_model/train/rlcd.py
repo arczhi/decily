@@ -48,6 +48,8 @@ class RLCDConfig:
     ce_weight: float = 1.0
     spherical_weight: float = 0.75
     brier_weight: float = 0.5
+    focal_gamma: float = 0.0
+    distill_ratio: float = 0.0
     kl_temperature: float = 1.0
     belief_ratio: float = 0.4
     abstention_ratio: float = 0.0
@@ -128,7 +130,14 @@ def rlcd_losses(
             smooth.scatter_(1, tgt.unsqueeze(1), 1.0 - ls)
             smooth = smooth.masked_fill(~full_valid[row_mask], 0.0)
             smooth = smooth / smooth.sum(-1, keepdim=True).clamp(min=1e-9)
-            losses["ce"] = -(smooth * F.log_softmax(lg, dim=-1)).sum(-1).mean()
+            logp_ce = F.log_softmax(lg, dim=-1)
+            per_row = -(smooth * logp_ce).sum(-1)
+            if cfg.focal_gamma > 0:
+                p_gold = logp_ce.gather(
+                    1, tgt.unsqueeze(1)
+                ).squeeze(1).exp().clamp(max=1.0)
+                per_row = per_row * (1.0 - p_gold).pow(cfg.focal_gamma)
+            losses["ce"] = per_row.mean()
 
     # ---- belief: combined proper score (log + spherical) on soft targets ----
     if has_soft.any():
@@ -200,11 +209,13 @@ class RLCDTrainer:
         eval_examples: list[DecisionExample],
         belief_eval_examples: list[DecisionExample],
         cfg: RLCDConfig,
+        distill_sampler: MixtureSampler | None = None,
     ) -> None:
         self.model = model
         self.ref = reference_model
         self.collator = collator
         self.sampler = sampler
+        self.distill_sampler = distill_sampler
         self.belief_examples = belief_examples
         self.eval_examples = eval_examples
         self.belief_eval_examples = belief_eval_examples
@@ -214,11 +225,21 @@ class RLCDTrainer:
         cfg = self.cfg
         rng = random.Random(cfg.seed)
         stream = self.sampler.sample(cfg.steps * cfg.batch_size * cfg.grad_accum, start_seed=cfg.seed)
+        distill_stream = (
+            self.distill_sampler.sample(
+                cfg.steps * cfg.batch_size * cfg.grad_accum, start_seed=cfg.seed + 1
+            )
+            if self.distill_sampler is not None and cfg.distill_ratio > 0
+            else None
+        )
         belief_pool = self.belief_examples
         for _ in range(cfg.steps * cfg.grad_accum):
             batch: list[DecisionExample] = []
             while len(batch) < cfg.batch_size:
-                if rng.random() < cfg.belief_ratio:
+                r = rng.random()
+                if distill_stream is not None and r < cfg.distill_ratio:
+                    batch.append(next(distill_stream))
+                elif r < cfg.distill_ratio + cfg.belief_ratio:
                     batch.append(belief_pool[rng.randrange(len(belief_pool))])
                 else:
                     ex = next(stream)

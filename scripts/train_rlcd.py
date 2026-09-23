@@ -114,6 +114,15 @@ def main() -> None:
         min_options=cfg["data"].get("min_options", 2),
         max_options=cfg["data"].get("max_options", 16),
     )
+    distill_sampler = None
+    if cfg["data"].get("distill_manifest") and rcfg.distill_ratio > 0:
+        distill_items = [MixtureItem(**it) for it in cfg["data"]["distill_manifest"]]
+        distill_sampler = MixtureSampler(
+            distill_items,
+            seed=cfg.get("seed", 0) + 1,
+            min_options=cfg["data"].get("min_options", 2),
+            max_options=cfg["data"].get("max_options", 16),
+        )
     belief_examples = list(read_jsonl(cfg["data"]["belief_path"]))
     belief_eval_examples = list(read_jsonl(cfg["data"]["belief_eval_path"]))
     eval_examples = list(read_jsonl(cfg["data"]["eval_path"]))
@@ -126,6 +135,7 @@ def main() -> None:
     trainer = RLCDTrainer(
         model, reference, collator, sampler,
         belief_examples, eval_examples, belief_eval_examples, rcfg,
+        distill_sampler=distill_sampler,
     )
     trainer.run()
 
