@@ -708,6 +708,28 @@ gold-absent 两个集合）：
 2. 扩大弃权训练数据（比例↑、步数↑、按任务难度分层构造）
 3. 在真实部署分布上构造弃权样本（当前是随机抽 gold，过于均匀）
 
+## 9.14 RLCD 加强方案（文献调研 2026-09-23）
+
+来源：
+- decoding-jev（对 Jev/Laya 公开 notebook 的逆向分析）：RLCD 实现 =
+  belief reward **log score + 0.75 × spherical score**、logits 加噪采样多候选、
+  组内均值 baseline 的 REINFORCE、全权重 CE 项、事后温度拟合；
+  并警告"采样目标 ≠ 推理目标，proper reward 不保证部署校准"，建议受控消融
+- RLCR（arXiv 2507.16806）：二元 reward 的普通 RL **损害校准**；reward 加入
+  有界 proper score（Brier）可同时提升准确率与校准；优于事后置信度分类器
+- Mozannar & Sontag 2020（Learning to Defer）：置信度阈值法失败是理论已知；
+  需**联合训练独立 rejector**（defer 作为新类，CE over Y∪{⊥} 一致）
+- SelectiveNet（Geifman & El-Yaniv 2019）：predict/select 双头 + 覆盖率约束
+- Conformal selective prediction：分布无关阈值 + 有限样本覆盖保证
+
+对应我们的实测短板（§9.13 none 区分度弱）与改进项：
+
+| 优先级 | 动作 | 预期 |
+|---|---|---|
+| P1 | 独立 rejector 头 + 联合训练 + conformal/代价敏感阈值 | 5% 误弃权预算下正确弃权 6%→30-50% |
+| P2 | belief reward: log + 0.75·spherical；action reward 加 Brier 项 | RL 不再伤校准 |
+| P3 | 受控消融（确定性 proper score vs 采样 REINFORCE vs ±CE） | 确认训练目标的可迁移性 |
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
