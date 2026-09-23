@@ -48,8 +48,9 @@ def main() -> None:
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
-    rcfg = RLCDConfig(**cfg["rlcd"])
-    sft_ckpt = cfg["rlcd"]["sft_ckpt"]
+    rlcd_kwargs = dict(cfg["rlcd"])
+    sft_ckpt = rlcd_kwargs.pop("sft_ckpt")
+    rcfg = RLCDConfig(**rlcd_kwargs)
 
     model = build_model(cfg["model"], sft_ckpt)
     reference = build_model(cfg["model"], sft_ckpt)

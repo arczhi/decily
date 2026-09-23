@@ -76,6 +76,11 @@ def rlcd_losses(
     cfg: RLCDConfig,
 ) -> dict[str, Tensor]:
     logits = logits.float()
+    if logits.dim() == 3:
+        logits = logits[:, 0]
+    ref_logits = ref_logits.float()
+    if ref_logits.dim() == 3:
+        ref_logits = ref_logits[:, 0]
     valid = batch.option_valid[:, 0]
     logp = _masked_log_softmax(logits, valid)
     probs = logp.exp()
@@ -101,7 +106,7 @@ def rlcd_losses(
         losses["action"] = -(logp_action * adv).mean()
 
     if cfg.kl_weight > 0:
-        ref_logp = _masked_log_softmax(ref_logits.float(), valid)
+        ref_logp = _masked_log_softmax(ref_logits, valid)
         kl = (probs * (logp - ref_logp)).sum(-1)
         losses["kl"] = kl.mean()
 
