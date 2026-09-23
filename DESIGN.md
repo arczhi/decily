@@ -730,6 +730,33 @@ gold-absent 两个集合）：
 | P2 | belief reward: log + 0.75·spherical；action reward 加 Brier 项 | RL 不再伤校准 |
 | P3 | 受控消融（确定性 proper score vs 采样 REINFORCE vs ±CE） | 确认训练目标的可迁移性 |
 
+## 9.15 选择性预测：置信度排序与风险保证（2026-09-24）
+
+文献改道（依据 §9.14）：
+- selective classification 基准（44 数据集/18 方法）：专用 reject 头（SELNET/DG）
+  不是最优；**softmax-response 阈值 + 集成**是强基线
+- 实测确认：v3 的独立 rejector 头只带来边际改善（5% 预算下 6%→8.5%），
+  且 held-out acc −4pt → **弃用 rejector 路线，转向阈值标定**
+- 理论修正：split-conformal 的集合覆盖保证**不能**直接约束"接受子集错误率"；
+  改用 PAC 式选择性风险上界（Hoeffding）：
+  `risk_hat(t) + sqrt(log(1/delta)/(2 n_acc)) <= alpha`
+
+**核心实测（risk-coverage，held-out 60/77 类未见任务）**：
+
+| 覆盖 10% 时的选择性风险 | SFT | RLCD_v1 | RLCD_v2 | RLCD_v3 |
+|---|---|---|---|---|
+| risk | 0.21 | 0.21 | **0.03** | **0.07** |
+
+→ RLCD 的 belief 训练显著改善了**置信度排序**：只取最有把握的 10%，
+v2/v3 的准确率达 97%/93%（SFT 仅 79%）。
+
+关键工程结论：
+- **保证可行性受校准集大小支配**：Hoeffding 修正 `sqrt(3/(2n_acc))` 在
+  n_acc=60 时高达 0.16 → 300 条校准集下任何 α≤0.2 都不可行；
+  校准集扩到 2250 条（n_acc≈225）后 α=0.1~0.2 可行
+- 实用表述：报告 risk-coverage 曲线 + 经验阈值（校准集经验风险 ≤ α），
+  PAC 保证在样本足够时给出
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
