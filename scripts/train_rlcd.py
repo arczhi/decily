@@ -72,7 +72,7 @@ def _flush_reject(model, collator, chunk, device):
 
 
 def build_model(model_cfg: dict, ckpt_path: str):
-    cfg = {k: v for k, v in model_cfg.items() if k != "route"}
+    cfg = {k: v for k, v in model_cfg.items() if k not in ("route", "init_ckpt")}
     model = CrossEncoderDecisionModel(CrossEncoderConfig(**cfg))
     ckpt = torch.load(ckpt_path, map_location="cpu")
     state = ckpt["state"] if isinstance(ckpt, dict) and "state" in ckpt else ckpt

@@ -29,7 +29,7 @@ def build(cfg_path: str, ckpt_path: str):
 
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)
-    model_cfg = {k: v for k, v in cfg["model"].items() if k != "route"}
+    model_cfg = {k: v for k, v in cfg["model"].items() if k not in ("route", "init_ckpt")}
     model = CrossEncoderDecisionModel(CrossEncoderConfig(**model_cfg))
     ckpt = torch.load(ckpt_path, map_location="cpu")
     state = ckpt["state"] if "state" in ckpt else ckpt

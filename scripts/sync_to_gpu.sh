@@ -9,6 +9,8 @@ rsync -az --delete \
   --exclude '.pytest_cache' \
   --exclude 'runs' \
   --exclude 'data/raw' \
+  --exclude 'data/distill*' \
+  --exclude 'data/merged*' \
   --exclude 'data/eval' \
   --exclude '*.pt' \
   --exclude '.git' \

@@ -31,7 +31,7 @@ def main() -> None:
 
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
-    model_cfg = {k: v for k, v in cfg["model"].items() if k != "route"}
+    model_cfg = {k: v for k, v in cfg["model"].items() if k not in ("route", "init_ckpt")}
     model_cfg["dtype"] = "float32"  # merge in fp32 for accuracy
     model = CrossEncoderDecisionModel(CrossEncoderConfig(**model_cfg))
 

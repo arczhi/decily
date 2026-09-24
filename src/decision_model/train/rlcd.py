@@ -282,9 +282,10 @@ class RLCDTrainer:
         random.seed(cfg.seed)
         device = cfg.device
         self.model.to(device)
-        self.ref.to(device).eval()
-        for p in self.ref.parameters():
-            p.requires_grad = False
+        if self.ref is not self.model:
+            self.ref.to(device).eval()
+            for p in self.ref.parameters():
+                p.requires_grad = False
 
         trainable = [p for p in self.model.parameters() if p.requires_grad]
         print(f"[rlcd] trainable params: {sum(p.numel() for p in trainable)/1e6:.2f}M", flush=True)
@@ -305,8 +306,11 @@ class RLCDTrainer:
             batch = _to_device(self.collator(examples), device)
             self.model.train()
             out = self.model(batch)
-            with torch.no_grad():
-                ref_out = self.ref(batch)
+            if self.ref is self.model:
+                ref_out = out
+            else:
+                with torch.no_grad():
+                    ref_out = self.ref(batch)
             losses = rlcd_losses(out, ref_out, batch, cfg)
             (losses["total"] / cfg.grad_accum).backward()
             for k, v in losses.items():

@@ -24,7 +24,7 @@ from decision_model.models.decision_model import (
 
 
 def make_model(cfg: dict, device: str):
-    model_cfg = {k: v for k, v in cfg["model"].items() if k != "route"}
+    model_cfg = {k: v for k, v in cfg["model"].items() if k not in ("route", "init_ckpt")}
     m = RouteBDecisionModel(RouteBConfig(**model_cfg)).to(device)
     return m
 
