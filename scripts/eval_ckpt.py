@@ -34,7 +34,7 @@ def build_model(cfg: dict, ckpt_path: str | None):
     from decision_model.models.decision_model import RouteBConfig, RouteBDecisionModel
     from decision_model.models.route_a import RouteAConfig, RouteADecisionModel
 
-    model_cfg = {k: v for k, v in cfg["model"].items() if k != "route"}
+    model_cfg = {k: v for k, v in cfg["model"].items() if k not in ("route", "init_ckpt")}
     route = cfg["model"].get("route", "b")
     if route == "b":
         model = RouteBDecisionModel(RouteBConfig(**model_cfg))
