@@ -159,39 +159,42 @@ def main() -> None:
         batch_size=rcfg.eval_batch_size, device=rcfg.device,
     )
 
-    # practical open-set checks via the reject head (v3)
+    # practical open-set checks via the reject head (v3 models only)
     import numpy as _np
     import random as _random
 
     from decision_model.data.transforms import drop_gold
     from decision_model.infer.abstention import abstention_curve
 
-    heldout_examples = list(read_jsonl(cfg["data"]["heldout_path"]))
-    absent = [drop_gold(ex) for ex in heldout_examples if not ex.questions[0].defer]
-    present_rows = _collect_with_reject(
-        model, collator, heldout_examples, batch_size=rcfg.eval_batch_size,
-        device=rcfg.device, max_batches=rcfg.eval_max_batches,
-    )
-    absent_rows = _collect_with_reject(
-        model, collator, absent, batch_size=rcfg.eval_batch_size,
-        device=rcfg.device, max_batches=rcfg.eval_max_batches,
-    )
-    curve = abstention_curve(present_rows, absent_rows)
-    chosen = curve.pick(target_false=0.05)
-    report["abstention"] = {
-        "chosen_5pct_budget": chosen,
-        "false_abstain_rate_at_0": float(
-            _np.mean([int(_np.argmax(lg)) == len(lg) - 1 for lg in present_rows])
-        ),
-        "correct_abstain_rate_at_0": float(
-            _np.mean([int(_np.argmax(lg)) == len(lg) - 1 for lg in absent_rows])
-        ),
-        "curve": {
-            "bias": curve.biases,
-            "correct": curve.correct_rates,
-            "false": curve.false_rates,
-        },
-    }
+    if getattr(model, "reject_head", None) is None:
+        report["abstention"] = {"note": "model has no rejector head"}
+    else:
+        heldout_examples = list(read_jsonl(cfg["data"]["heldout_path"]))
+        absent = [drop_gold(ex) for ex in heldout_examples if not ex.questions[0].defer]
+        present_rows = _collect_with_reject(
+            model, collator, heldout_examples, batch_size=rcfg.eval_batch_size,
+            device=rcfg.device, max_batches=rcfg.eval_max_batches,
+        )
+        absent_rows = _collect_with_reject(
+            model, collator, absent, batch_size=rcfg.eval_batch_size,
+            device=rcfg.device, max_batches=rcfg.eval_max_batches,
+        )
+        curve = abstention_curve(present_rows, absent_rows)
+        chosen = curve.pick(target_false=0.05)
+        report["abstention"] = {
+            "chosen_5pct_budget": chosen,
+            "false_abstain_rate_at_0": float(
+                _np.mean([int(_np.argmax(lg)) == len(lg) - 1 for lg in present_rows])
+            ),
+            "correct_abstain_rate_at_0": float(
+                _np.mean([int(_np.argmax(lg)) == len(lg) - 1 for lg in absent_rows])
+            ),
+            "curve": {
+                "bias": curve.biases,
+                "correct": curve.correct_rates,
+                "false": curve.false_rates,
+            },
+        }
 
     # per-task-family temperatures (practical calibration)
     from decision_model.eval.harness import fit_temperature_rows as _fit

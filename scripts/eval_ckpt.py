@@ -80,6 +80,7 @@ def main() -> None:
     ap.add_argument("--fit-temperature", action="store_true")
     ap.add_argument("--out", default=None, help="write metrics JSON here")
     ap.add_argument("--per-task", action="store_true")
+    ap.add_argument("--belief", action="store_true")
     args = ap.parse_args()
 
     with open(args.config, "r", encoding="utf-8") as f:
@@ -102,6 +103,13 @@ def main() -> None:
         }
         if args.per_task:
             row["per_task"] = metrics_by_task(rows, temperature=1.0)
+        if args.belief and cfg["data"].get("belief_eval_path"):
+            from decision_model.eval.belief import evaluate_belief
+
+            row["belief_eval"] = evaluate_belief(
+                model, coll, list(read_jsonl(cfg["data"]["belief_eval_path"])),
+                batch_size=args.batch_size, device=args.device,
+            )
         report[path] = row
         print(f"\n=== {path} (route {route}) ===")
         print(json.dumps(row, indent=2, ensure_ascii=False))

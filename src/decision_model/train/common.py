@@ -32,6 +32,8 @@ class TrainConfig:
     grad_accum: int = 1
     length_bucket: bool = False
     bucket_buffer_mult: int = 8
+    optim: str = "adamw"  # adamw | adamw8bit
+    save_dtype: str = "float32"
     log_every: int = 20
     eval_every: int = 250
     eval_batch_size: int = 64
@@ -104,11 +106,16 @@ class Trainer:
 
     def _save(self, step: int, tag: str) -> None:
         os.makedirs(self.cfg.out_dir, exist_ok=True)
+        cast = {
+            "float32": torch.float32,
+            "bfloat16": torch.bfloat16,
+            "float16": torch.float16,
+        }.get(self.cfg.save_dtype, torch.float32)
         if self.cfg.save_trainable_only:
             state = {
                 k: v for k, v in self.model.named_parameters() if v.requires_grad
             }
-            state = {k: v.detach().cpu() for k, v in state.items()}
+            state = {k: v.detach().to(cast).cpu() for k, v in state.items()}
         else:
             state = {k: v.detach().cpu() for k, v in self.model.state_dict().items()}
         path = os.path.join(self.cfg.out_dir, f"ckpt_{tag}.pt")
@@ -127,7 +134,14 @@ class Trainer:
                 "no trainable parameters; unfreeze the backbone or enable LoRA"
             )
         print(f"[train] trainable params: {n_train/1e6:.2f}M", flush=True)
-        optimizer = AdamW(trainable, lr=cfg.lr, weight_decay=cfg.weight_decay)
+        if cfg.optim == "adamw8bit":
+            import bitsandbytes as bnb
+
+            optimizer = bnb.optim.AdamW8bit(
+                trainable, lr=cfg.lr, weight_decay=cfg.weight_decay
+            )
+        else:
+            optimizer = AdamW(trainable, lr=cfg.lr, weight_decay=cfg.weight_decay)
         scheduler = _make_scheduler(optimizer, cfg)
 
         os.makedirs(cfg.out_dir, exist_ok=True)

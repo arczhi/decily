@@ -28,6 +28,7 @@ class CrossEncoderConfig:
     backbone: str = "answerdotai/ModernBERT-base"
     freeze_backbone: bool = True
     dtype: str = "float32"
+    amp_dtype: str = "bfloat16"
     lora: bool = False
     lora_r: int = 16
     lora_alpha: int = 32
@@ -91,10 +92,11 @@ class CrossEncoderDecisionModel(nn.Module):
             if cfg.rejector
             else None
         )
-        # Trainable modules stay in fp32 (LoRA adapters + head); the frozen
-        # encoder holds the low-precision weights. Forward runs under autocast
-        # so matmuls use bf16 while optimizer states stay fp32 (AMP/QLoRA style).
-        self._compute_dtype = DTYPES.get(cfg.dtype, torch.float32)
+        # Trainable modules stay in their parameter dtype; forward runs under
+        # autocast with amp_dtype so matmuls use bf16 while optimizer states
+        # stay fp32 (AMP/QLoRA style). For full fine-tuning use dtype=float32
+        # (fp32 master weights) + amp_dtype=bfloat16.
+        self._compute_dtype = DTYPES.get(cfg.amp_dtype, torch.bfloat16)
 
     def _joint_inputs(
         self, batch: RouteBBatch
