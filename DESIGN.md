@@ -820,6 +820,43 @@ v2/v3 的准确率达 97%/93%（SFT 仅 79%）。
 0.37 vs 0.32，完全健康（单批 CE 波动范围 0.17~3.28，窗口均值波动是噪声）。
 已修复：除以 `window * accum`。教训：**跨 run 比较 loss 前先统一 accum**。
 
+## 9.19 Model Soup 实验记录（2026-09-24，含 bug 与结论）
+
+动机（Wortsman et al., ICML 2022）：同一误差盆地内的微调模型做**权重平均**
+可提升精度/鲁棒性且零推理成本；贪心版逐个加入有增益的模型。
+
+协议：候选 = {SFT, v1, v2, fullFT@1500}；LoRA 先合并为全权重（fp32）；
+选择集 = stage1_heldout_big 前 3000 条；测试集 = stage1_heldout 1200 条（独立）。
+
+**单模型（选择集）**：
+
+| 模型 | acc | ECE |
+|---|---|---|
+| SFT | 0.5453 | 0.096 |
+| v1 | 0.5403 | 0.090 |
+| v2 | 0.5327 | **0.067** |
+| fullFT@1500 | **0.5607** | 0.164 |
+
+**贪心结果**：seed = fullFT (0.5607) → **+SFT = 0.5670 ACCEPT** → +v1 = 0.0427
+reject → +v2 = 0.0400 reject（运行随后退出，未写报告）
+
+**发现的两个实现 bug**：
+1. `evaluate_state` 用 `lora=true` 的架构去加载**已合并的全权重** → 键名不匹配，
+   实际评测的是"底模 + 训练过的 head"（v2 单模型误报 0.106；修复后为 0.533）。
+   修复：评测合并权重时强制 `lora=false`。
+2. 贪心循环的 baseline 在"拒绝"后没有回退（用了上一次尝试的 acc 而非当前 soup 的 acc）。
+   未修复（实验已中止）。
+
+**未解现象**：加入 v1/v2 的权重平均试次 accuracy ≈ 0.04（≈ argmax 恒为 0 的 NaN
+特征；单模型状态本身正常 0.53-0.54）。怀疑与 4 份 fp32 状态（~28GB CPU）下的
+内存压力或某 tensor 的 NaN 有关，未定位。
+
+**结论**：即便按最好情形看，权重 soup 的增益也只是
+**{fullFT+SFT} 0.567 vs fullFT 0.561（选择集 +0.6pt）**，性价比低。
+且权重平均对"跨盆地"模型（fullFT 与 LoRA 系）本就敏感。
+→ 改用**概率空间集成**（Deep Ensembles, Lakshminarayanan 2017；
+selective classification 基准中 ENS+SR 为第一），无需权重对齐、跨盆地稳健。
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward

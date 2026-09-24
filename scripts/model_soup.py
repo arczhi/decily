@@ -79,6 +79,9 @@ def evaluate_state(
     device: str = "cuda",
     batch_size: int = 8,
 ) -> tuple[dict, float]:
+    # states are always materialized (LoRA merged) full weights -> plain model
+    cfg_model = dict(cfg_model)
+    cfg_model["lora"] = False
     model = CrossEncoderDecisionModel(CrossEncoderConfig(**cfg_model))
     model.load_state_dict(state, strict=False)
     model.to(device).eval()
