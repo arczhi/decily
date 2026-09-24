@@ -66,6 +66,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--ckpts", nargs="+", required=True)
+    ap.add_argument("--configs", nargs="+", default=None)
     ap.add_argument("--out-dir", default="data/distill")
     ap.add_argument("--batch-size", type=int, default=16)
     args = ap.parse_args()
@@ -77,7 +78,11 @@ def main() -> None:
         tok.pad_token = tok.eos_token
     coll = RouteBCollator(tok, **cfg["data"]["collator"])
 
-    models = [load_model(cfg, c) for c in args.ckpts]
+    configs = args.configs or [args.config] * len(args.ckpts)
+    models = [
+        load_model(yaml.safe_load(open(cfg_i)), c)
+        for cfg_i, c in zip(configs, args.ckpts)
+    ]
     print(f"[teacher] {len(models)} teachers loaded", flush=True)
 
     os.makedirs(args.out_dir, exist_ok=True)

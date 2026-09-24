@@ -1,0 +1,221 @@
+seed: 0
+model:
+  route: cx
+  backbone: /root/models/Qwen3-1.7B-Base
+  freeze_backbone: false
+  dtype: float32
+  amp_dtype: bfloat16
+  lora: false
+  pool: attention
+  dropout: 0.0
+  label_smoothing: 0.05
+  attn_implementation: sdpa
+  grad_checkpointing: true
+  init_ckpt: runs/merged_sft/model.pt
+data:
+  collator:
+    max_state_tokens: 256
+    max_question_tokens: 96
+    max_option_tokens: 64
+  min_options: 2
+  max_options: 16
+  eval_path: data/eval/stage2_intask.jsonl
+  heldout_path: data/eval/stage1_heldout.jsonl
+  belief_eval_path: data/raw/belief_v2_eval.jsonl
+  probe_path: data/raw/sst2_train.jsonl
+  manifest:
+  - task: sst2
+    path: data/raw/sst2_train.jsonl
+    weight: 1.0
+  - task: ag_news
+    path: data/raw/ag_news_train.jsonl
+    weight: 1.0
+  - task: mnli
+    path: data/raw/mnli_train.jsonl
+    weight: 1.0
+  - task: arc_easy
+    path: data/raw/arc_easy_train.jsonl
+    weight: 1.0
+  - task: amazon_polarity
+    path: data/raw/amazon_polarity_train.jsonl
+    weight: 1.0
+  - task: imdb
+    path: data/raw/imdb_train.jsonl
+    weight: 1.0
+  - task: tweet_sentiment
+    path: data/raw/tweet_sentiment_train.jsonl
+    weight: 1.0
+  - task: toxic_conversations
+    path: data/raw/toxic_conversations_train.jsonl
+    weight: 1.0
+  - task: counterfactual
+    path: data/raw/counterfactual_train.jsonl
+    weight: 1.0
+  - task: tweet_topic
+    path: data/raw/tweet_topic_train.jsonl
+    weight: 1.0
+  - task: poem_sentiment
+    path: data/raw/poem_sentiment_train.jsonl
+    weight: 1.0
+  - task: dbpedia
+    path: data/raw/dbpedia_train.jsonl
+    weight: 1.0
+  - task: rte
+    path: data/raw/rte_train.jsonl
+    weight: 1.0
+  - task: qqp
+    path: data/raw/qqp_train.jsonl
+    weight: 1.0
+  - task: mrpc
+    path: data/raw/mrpc_train.jsonl
+    weight: 1.0
+  - task: arc_challenge
+    path: data/raw/arc_challenge_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_world_history
+    path: data/raw/mmlu_high_school_world_history_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_biology
+    path: data/raw/mmlu_high_school_biology_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_physics
+    path: data/raw/mmlu_high_school_physics_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_government_and_politics
+    path: data/raw/mmlu_high_school_government_and_politics_train.jsonl
+    weight: 0.5
+  - task: mmlu_college_computer_science
+    path: data/raw/mmlu_college_computer_science_train.jsonl
+    weight: 0.5
+  - task: mmlu_moral_scenarios
+    path: data/raw/mmlu_moral_scenarios_train.jsonl
+    weight: 0.5
+  - task: mmlu_professional_law
+    path: data/raw/mmlu_professional_law_train.jsonl
+    weight: 0.5
+  - task: mmlu_world_religions
+    path: data/raw/mmlu_world_religions_train.jsonl
+    weight: 0.5
+  distill_manifest:
+  - task: sst2
+    path: data/distill5/sst2_train.jsonl
+    weight: 1.0
+  - task: ag_news
+    path: data/distill5/ag_news_train.jsonl
+    weight: 1.0
+  - task: mnli
+    path: data/distill5/mnli_train.jsonl
+    weight: 1.0
+  - task: arc_easy
+    path: data/distill5/arc_easy_train.jsonl
+    weight: 1.0
+  - task: amazon_polarity
+    path: data/distill5/amazon_polarity_train.jsonl
+    weight: 1.0
+  - task: imdb
+    path: data/distill5/imdb_train.jsonl
+    weight: 1.0
+  - task: tweet_sentiment
+    path: data/distill5/tweet_sentiment_train.jsonl
+    weight: 1.0
+  - task: toxic_conversations
+    path: data/distill5/toxic_conversations_train.jsonl
+    weight: 1.0
+  - task: counterfactual
+    path: data/distill5/counterfactual_train.jsonl
+    weight: 1.0
+  - task: tweet_topic
+    path: data/distill5/tweet_topic_train.jsonl
+    weight: 1.0
+  - task: poem_sentiment
+    path: data/distill5/poem_sentiment_train.jsonl
+    weight: 1.0
+  - task: dbpedia
+    path: data/distill5/dbpedia_train.jsonl
+    weight: 1.0
+  - task: rte
+    path: data/distill5/rte_train.jsonl
+    weight: 1.0
+  - task: qqp
+    path: data/distill5/qqp_train.jsonl
+    weight: 1.0
+  - task: mrpc
+    path: data/distill5/mrpc_train.jsonl
+    weight: 1.0
+  - task: arc_challenge
+    path: data/distill5/arc_challenge_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_world_history
+    path: data/distill5/mmlu_high_school_world_history_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_biology
+    path: data/distill5/mmlu_high_school_biology_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_physics
+    path: data/distill5/mmlu_high_school_physics_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_government_and_politics
+    path: data/distill5/mmlu_high_school_government_and_politics_train.jsonl
+    weight: 0.5
+  - task: mmlu_college_computer_science
+    path: data/distill5/mmlu_college_computer_science_train.jsonl
+    weight: 0.5
+  - task: mmlu_moral_scenarios
+    path: data/distill5/mmlu_moral_scenarios_train.jsonl
+    weight: 0.5
+  - task: mmlu_professional_law
+    path: data/distill5/mmlu_professional_law_train.jsonl
+    weight: 0.5
+  - task: mmlu_world_religions
+    path: data/distill5/mmlu_world_religions_train.jsonl
+    weight: 0.5
+  belief_path: data/raw/belief_v2_train.jsonl
+train:
+  steps: 3000
+  batch_size: 2
+  grad_accum: 8
+  lr: 1.0e-05
+  weight_decay: 0.01
+  grad_clip: 1.0
+  warmup_steps: 300
+  scheduler: cosine
+  length_bucket: true
+  optim: adamw8bit
+  save_dtype: bfloat16
+  log_every: 50
+  eval_every: 1500
+  eval_batch_size: 8
+  eval_max_batches: 60
+  out_dir: runs/fullft_sft17b
+  seed: 0
+  device: cuda
+  label_smoothing: 0.05
+  save_trainable_only: true
+rlcd:
+  steps: 3000
+  batch_size: 2
+  grad_accum: 8
+  lr: 1.0e-05
+  weight_decay: 0.01
+  grad_clip: 1.0
+  warmup_steps: 300
+  scheduler: cosine
+  kd_temperature: 2.0
+  kd_alpha: 0.5
+  belief_weight: 1.0
+  action_weight: 0.0
+  ce_weight: 1.0
+  spherical_weight: 0.0
+  kl_weight: 0.0
+  belief_ratio: 0.15
+  abstention_ratio: 0.0
+  distill_ratio: 0.0
+  log_every: 50
+  eval_every: 1500
+  eval_batch_size: 8
+  eval_max_batches: 60
+  out_dir: runs/rlcd_v5_distill
+  seed: 0
+  device: cuda
+  save_trainable_only: true
+  sft_ckpt: runs/merged_sft/model.pt

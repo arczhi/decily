@@ -99,7 +99,10 @@ def main() -> None:
     rcfg = RLCDConfig(**rlcd_kwargs)
 
     model = build_model(cfg["model"], sft_ckpt)
-    reference = build_model(cfg["model"], sft_ckpt)
+    if rcfg.kl_weight > 0:
+        reference = build_model(cfg["model"], sft_ckpt)
+    else:
+        reference = model
     print("[rlcd] loaded SFT checkpoint:", sft_ckpt, flush=True)
 
     tok = AutoTokenizer.from_pretrained(cfg["model"]["backbone"])

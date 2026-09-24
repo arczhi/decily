@@ -50,6 +50,8 @@ class RLCDConfig:
     brier_weight: float = 0.5
     focal_gamma: float = 0.0
     distill_ratio: float = 0.0
+    kd_temperature: float = 0.0  # >0 enables Hinton-style KD on soft-target rows
+    kd_alpha: float = 0.5  # weight on CE(gold) vs KD
     kl_temperature: float = 1.0
     belief_ratio: float = 0.4
     abstention_ratio: float = 0.0
@@ -139,14 +141,33 @@ def rlcd_losses(
                 per_row = per_row * (1.0 - p_gold).pow(cfg.focal_gamma)
             losses["ce"] = per_row.mean()
 
-    # ---- belief: combined proper score (log + spherical) on soft targets ----
+    # ---- soft-target rows: Hinton KD (teacher) or proper score (belief laws) ----
     if has_soft.any():
         soft = batch.soft_targets[:, 0][has_soft]
         soft = soft / soft.sum(-1, keepdim=True).clamp(min=1e-9)
-        p = probs[has_soft]
-        log_score = (soft * logp[has_soft]).sum(-1)
-        spherical = (soft * p).sum(-1) / p.norm(dim=-1).clamp(min=1e-9)
-        losses["belief"] = -(log_score + cfg.spherical_weight * spherical).mean()
+        if cfg.kd_temperature > 0:
+            T = cfg.kd_temperature
+            teacher_t = torch.softmax(torch.log(soft.clamp(min=1e-9)) / T, dim=-1)
+            student_logp_t = F.log_softmax(
+                logits[has_soft] / T, dim=-1
+            ).masked_fill(~valid[has_soft], -1e9)
+            kd = (teacher_t * (torch.log(teacher_t.clamp(min=1e-9)) - student_logp_t)).sum(-1)
+            kd = kd * (T ** 2)
+            # hard-label CE on the same rows (teacher rows carry gold labels)
+            hard_mask = has_soft & (batch.answer_index[:, 0] >= 0)
+            if hard_mask.any():
+                gold2 = batch.answer_index[:, 0][hard_mask].clamp(min=0)
+                ce_hard = F.cross_entropy(
+                    logits[hard_mask].masked_fill(~valid[hard_mask], -1e9), gold2
+                )
+                losses["belief"] = cfg.kd_alpha * ce_hard + (1 - cfg.kd_alpha) * kd.mean()
+            else:
+                losses["belief"] = kd.mean()
+        else:
+            p = probs[has_soft]
+            log_score = (soft * logp[has_soft]).sum(-1)
+            spherical = (soft * p).sum(-1) / p.norm(dim=-1).clamp(min=1e-9)
+            losses["belief"] = -(log_score + cfg.spherical_weight * spherical).mean()
 
     # ---- action: REINFORCE with reward = correct + brier (RLCR-style) ----
     hard = ~has_soft
