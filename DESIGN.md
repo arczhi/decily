@@ -918,6 +918,29 @@ selective classification 基准中 ENS+SR 为第一），无需权重对齐、�
 5. v5 配置的 manifest 曾指向原始硬标签数据 + distill_ratio=0 → KD 完全没生效
    （已改为 manifest 直接指向教师分布数据）
 
+## 9.22 MLX 转换（Mac 端推理，2026-09-24 完成）
+
+产物：`models_mlx/v5_mlx/`（model.safetensors 3.47GB + config + tokenizer）
++ `mlx/decision_mlx.py`（纯 mlx.core 实现，无需 torch）
+
+对拍验证（固定 ids / 同一样本）：
+- logit：MLX **-10.278** vs torch -10.25（差 0.03）
+- 样本概率：{tech 0.568, shipping 0.370, returns 0.054, billing 0.009}
+  vs torch {0.562, 0.374, 0.056, 0.009}
+
+**关键坑**：MLX `mx.fast.rope(traditional=False)` 与 HF 的 rotate_half 约定
+**不一致**（导致 28 层累积后隐藏态 std 偏差 3%、logit 偏差 6）→ 手写
+rotate_half RoPE 后完全对齐。已记在代码注释里。
+
+其他实现要点：RMSNorm 按 HF 习惯用 fp32 内部计算；因果掩码显式构造；
+GQA 用 repeat 展开；pool/head 在 fp32 下计算。
+
+用法：
+```
+python mlx/decision_mlx.py --model-dir models_mlx/v5_mlx \
+  --state "..." --question "..." --options "a,b,c" --temperature 0.45
+```
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
