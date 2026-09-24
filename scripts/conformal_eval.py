@@ -37,7 +37,7 @@ from decision_model.models.cross_encoder import (  # noqa: E402
 
 
 def load_model(cfg: dict, ckpt: str):
-    model_cfg = {k: v for k, v in cfg["model"].items() if k != "route"}
+    model_cfg = {k: v for k, v in cfg["model"].items() if k not in ("route", "init_ckpt")}
     model = CrossEncoderDecisionModel(CrossEncoderConfig(**model_cfg))
     state = torch.load(ckpt, map_location="cpu")
     state = state["state"] if isinstance(state, dict) and "state" in state else state
