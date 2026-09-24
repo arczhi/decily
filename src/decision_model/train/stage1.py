@@ -22,6 +22,7 @@ from .common import TrainConfig, Trainer
 def build(cfg: dict):
     model_cfg = dict(cfg["model"])
     route = model_cfg.pop("route", "b")
+    init_ckpt = model_cfg.pop("init_ckpt", None)
     if route == "b":
         model = RouteBDecisionModel(RouteBConfig(**model_cfg))
         collator_cls = RouteBCollator
@@ -33,6 +34,18 @@ def build(cfg: dict):
     else:
         model = RouteADecisionModel(RouteAConfig(**model_cfg))
         collator_cls = RouteACollator
+    if init_ckpt:
+        import torch as _torch
+
+        _ckpt = _torch.load(init_ckpt, map_location="cpu")
+        _state = _ckpt["state"] if isinstance(_ckpt, dict) and "state" in _ckpt else _ckpt
+        _res = model.load_state_dict(_state, strict=False)
+        print(
+            f"[init] warm start from {init_ckpt}: "
+            f"missing={len(_res.missing_keys)} unexpected={len(_res.unexpected_keys)}",
+            flush=True,
+        )
+
     tok = AutoTokenizer.from_pretrained(model_cfg["backbone"])
     if tok.pad_token_id is None:
         tok.pad_token = tok.eos_token

@@ -184,7 +184,8 @@ class Trainer:
             running["grad_norm"] = running.get("grad_norm", 0.0) + float(grad_norm)
 
             if window >= cfg.log_every:
-                avg = {k: v / window for k, v in running.items()}
+                # running accumulates per MICRO-batch; divide by micro-batches, not steps
+                avg = {k: v / (window * accum) for k, v in running.items()}
                 running = {}
                 window = 0
                 line = {"step": opt_step, "sec": round(time.time() - t0, 1), **avg}

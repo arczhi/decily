@@ -811,6 +811,15 @@ v2/v3 的准确率达 97%/93%（SFT 仅 79%）。
 **下一步（Stage 5，未完成）**：多模态（Qwen3.5-2B VL + vision tower + 文本路径
 隔离 + 30% 文本 replay + 回归门禁）；训练任务 24→60+；全参微调对照。
 
+## 9.18 工程教训：日志累积除法 bug（2026-09-24）
+
+`Trainer` 记录 loss 时用 `sum(所有 micro-batch loss) / window(优化步数)`，
+而每个优化步含 `accum` 个 micro-batch → **日志值被放大 accum 倍**。
+影响：所有历史 run 的 `choice_ce`/`grad_norm` 日志都被放大（÷accum 才是真值）。
+前 1.7B 全参微调曾因 2.95 vs SFT 1.29 的"发散"误判被两次重启——真实值
+0.37 vs 0.32，完全健康（单批 CE 波动范围 0.17~3.28，窗口均值波动是噪声）。
+已修复：除以 `window * accum`。教训：**跨 run 比较 loss 前先统一 accum**。
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
