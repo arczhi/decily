@@ -52,6 +52,8 @@ class RLCDConfig:
     distill_ratio: float = 0.0
     kd_temperature: float = 0.0  # >0 enables Hinton-style KD on soft-target rows
     kd_alpha: float = 0.5  # weight on CE(gold) vs KD
+    optim: str = "adamw"  # adamw | adamw8bit
+    save_dtype: str = "float32"  # bfloat16 halves full-FT checkpoint size
     kl_temperature: float = 1.0
     belief_ratio: float = 0.4
     abstention_ratio: float = 0.0
@@ -147,12 +149,16 @@ def rlcd_losses(
         soft = soft / soft.sum(-1, keepdim=True).clamp(min=1e-9)
         if cfg.kd_temperature > 0:
             T = cfg.kd_temperature
-            teacher_t = torch.softmax(torch.log(soft.clamp(min=1e-9)) / T, dim=-1)
-            student_logp_t = F.log_softmax(
-                logits[has_soft] / T, dim=-1
-            ).masked_fill(~valid[has_soft], -1e9)
-            kd = (teacher_t * (torch.log(teacher_t.clamp(min=1e-9)) - student_logp_t)).sum(-1)
-            kd = kd * (T ** 2)
+            valid_s = valid[has_soft]
+            z_teacher = (torch.log(soft.clamp(min=1e-9)) / T).masked_fill(
+                ~valid_s, float("-inf")
+            )
+            teacher_t = torch.softmax(z_teacher, dim=-1)
+            student_logp_t = F.log_softmax(logits[has_soft] / T, dim=-1).masked_fill(
+                ~valid_s, -1e9
+            )
+            kd = teacher_t * (torch.log(teacher_t.clamp(min=1e-9)) - student_logp_t)
+            kd = kd.masked_fill(~valid_s, 0.0).sum(-1) * (T ** 2)
             # hard-label CE on the same rows (teacher rows carry gold labels)
             hard_mask = has_soft & (batch.answer_index[:, 0] >= 0)
             if hard_mask.any():
@@ -271,7 +277,16 @@ class RLCDTrainer:
 
     def _save(self, step: int, tag: str) -> str:
         os.makedirs(self.cfg.out_dir, exist_ok=True)
-        state = {k: v.detach().cpu() for k, v in self.model.named_parameters() if v.requires_grad}
+        cast = {
+            "float32": torch.float32,
+            "bfloat16": torch.bfloat16,
+            "float16": torch.float16,
+        }.get(getattr(self.cfg, "save_dtype", "float32"), torch.float32)
+        state = {
+            k: v.detach().to(cast).cpu()
+            for k, v in self.model.named_parameters()
+            if v.requires_grad
+        }
         path = os.path.join(self.cfg.out_dir, f"ckpt_{tag}.pt")
         torch.save({"step": step, "state": state, "config": asdict(self.cfg)}, path)
         return path
@@ -289,7 +304,14 @@ class RLCDTrainer:
 
         trainable = [p for p in self.model.parameters() if p.requires_grad]
         print(f"[rlcd] trainable params: {sum(p.numel() for p in trainable)/1e6:.2f}M", flush=True)
-        optimizer = AdamW(trainable, lr=cfg.lr, weight_decay=cfg.weight_decay)
+        if getattr(cfg, "optim", "adamw") == "adamw8bit":
+            import bitsandbytes as bnb
+
+            optimizer = bnb.optim.AdamW8bit(
+                trainable, lr=cfg.lr, weight_decay=cfg.weight_decay
+            )
+        else:
+            optimizer = AdamW(trainable, lr=cfg.lr, weight_decay=cfg.weight_decay)
         scheduler = _make_scheduler(optimizer, cfg)
 
         os.makedirs(cfg.out_dir, exist_ok=True)

@@ -881,6 +881,43 @@ selective classification 基准中 ENS+SR 为第一），无需权重对齐、�
 - 副产品：这也解释了 v4——当时教师池 {v1,SFT,v2,v3d} 的相关性高、
   且没有 fullFT 这样的异质成员
 
+## 9.21 RLCD v5：集成蒸馏回单模型（2026-09-24 完成）
+
+配方（文献确认：Hinton 2015 原始 KD + Reich 2020 集成蒸馏）：
+- 教师 = 4 模型（SFT/v1/v2/fullFT@1500）分布的算术平均
+- 学生 = 1.7B **全参**（从合并 SFT 热启动；容量匹配教师在先）
+- 损失 = α·CE(gold, T=1) + (1−α)·T²·KL(p_student^T ‖ p_teacher^T)，**T=2, α=0.5**
+- 数据 = 24 任务蒸馏集（66k，每例带教师分布）+ belief 15%
+- 3000 步，lr 1e-5，8-bit AdamW，bf16 checkpoint
+
+**最终对比（held-out = 未见 60/77 类任务；in-task 1200 条）**：
+
+| 模型 | held-out acc | held-out NLL | held-out ECE | in-task acc |
+|---|---|---|---|---|
+| SFT | 0.561 | 1.572 | 0.097 | 0.847 |
+| v1 | 0.557 | 1.602 | 0.116 | 0.840 |
+| v2 | 0.543 | 1.584 | **0.039** | 0.843 |
+| fullFT@1500 | **0.593** | 1.596 | 0.201 | 0.818 |
+| 集成（4 模型） | 0.575 | 1.455 | 0.061 | 0.847 |
+| **v5_distill（单模型）** | **0.581** | **1.451** | 0.068 | **0.863** |
+
+结论：
+- **蒸馏达成"单模型 = 集成质量"**：NLL 1.451（全场最佳，甚至略优于集成）、
+  acc 0.581（超所有 LoRA，仅次 fullFT）、ECE 0.068（接近集成）
+- **in-task acc 0.863 为全场最高**（蒸馏的正则化效应）
+- 推理成本回到 ×1 → v5 可作部署模型
+- belief 技能小幅退化（excess 0.030→0.069），因 KD 训练中 belief 仅占 15%；
+  如需恢复可加一轮短程 belief 微调
+
+**工程教训（本轮踩坑，均已修复）**：
+1. `rsync --delete` 误删远端新建的 data/distill5（已加排除规则）
+2. RLCDTrainer 缺 `save_dtype` → 全参 checkpoint 6.9GB/个写满磁盘
+   （已支持 bf16，3.4GB/个）
+3. RLCDTrainer 缺 8-bit 优化器支持 → fp32 Adam 占 13.6GB OOM（已支持 adamw8bit）
+4. KD 掩码 bug：padding 位教师概率 × 学生 -1e9 掩码 = loss 爆炸（已按有效位掩码）
+5. v5 配置的 manifest 曾指向原始硬标签数据 + distill_ratio=0 → KD 完全没生效
+   （已改为 manifest 直接指向教师分布数据）
+
 ## 10. 参考事实（来自公开实现）
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward

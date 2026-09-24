@@ -25,79 +25,6 @@ data:
   probe_path: data/raw/sst2_train.jsonl
   manifest:
   - task: sst2
-    path: data/raw/sst2_train.jsonl
-    weight: 1.0
-  - task: ag_news
-    path: data/raw/ag_news_train.jsonl
-    weight: 1.0
-  - task: mnli
-    path: data/raw/mnli_train.jsonl
-    weight: 1.0
-  - task: arc_easy
-    path: data/raw/arc_easy_train.jsonl
-    weight: 1.0
-  - task: amazon_polarity
-    path: data/raw/amazon_polarity_train.jsonl
-    weight: 1.0
-  - task: imdb
-    path: data/raw/imdb_train.jsonl
-    weight: 1.0
-  - task: tweet_sentiment
-    path: data/raw/tweet_sentiment_train.jsonl
-    weight: 1.0
-  - task: toxic_conversations
-    path: data/raw/toxic_conversations_train.jsonl
-    weight: 1.0
-  - task: counterfactual
-    path: data/raw/counterfactual_train.jsonl
-    weight: 1.0
-  - task: tweet_topic
-    path: data/raw/tweet_topic_train.jsonl
-    weight: 1.0
-  - task: poem_sentiment
-    path: data/raw/poem_sentiment_train.jsonl
-    weight: 1.0
-  - task: dbpedia
-    path: data/raw/dbpedia_train.jsonl
-    weight: 1.0
-  - task: rte
-    path: data/raw/rte_train.jsonl
-    weight: 1.0
-  - task: qqp
-    path: data/raw/qqp_train.jsonl
-    weight: 1.0
-  - task: mrpc
-    path: data/raw/mrpc_train.jsonl
-    weight: 1.0
-  - task: arc_challenge
-    path: data/raw/arc_challenge_train.jsonl
-    weight: 1.0
-  - task: mmlu_high_school_world_history
-    path: data/raw/mmlu_high_school_world_history_train.jsonl
-    weight: 0.5
-  - task: mmlu_high_school_biology
-    path: data/raw/mmlu_high_school_biology_train.jsonl
-    weight: 0.5
-  - task: mmlu_high_school_physics
-    path: data/raw/mmlu_high_school_physics_train.jsonl
-    weight: 0.5
-  - task: mmlu_high_school_government_and_politics
-    path: data/raw/mmlu_high_school_government_and_politics_train.jsonl
-    weight: 0.5
-  - task: mmlu_college_computer_science
-    path: data/raw/mmlu_college_computer_science_train.jsonl
-    weight: 0.5
-  - task: mmlu_moral_scenarios
-    path: data/raw/mmlu_moral_scenarios_train.jsonl
-    weight: 0.5
-  - task: mmlu_professional_law
-    path: data/raw/mmlu_professional_law_train.jsonl
-    weight: 0.5
-  - task: mmlu_world_religions
-    path: data/raw/mmlu_world_religions_train.jsonl
-    weight: 0.5
-  distill_manifest:
-  - task: sst2
     path: data/distill5/sst2_train.jsonl
     weight: 1.0
   - task: ag_news
@@ -219,3 +146,5 @@ rlcd:
   device: cuda
   save_trainable_only: true
   sft_ckpt: runs/merged_sft/model.pt
+  optim: adamw8bit
+  save_dtype: bfloat16
