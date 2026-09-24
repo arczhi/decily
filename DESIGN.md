@@ -941,7 +941,57 @@ python mlx/decision_mlx.py --model-dir models_mlx/v5_mlx \
   --state "..." --question "..." --options "a,b,c" --temperature 0.45
 ```
 
-## 10. 参考事实（来自公开实现）
+## 9.23 decider-2b 同台评测（2026-09-24 完成）
+
+用他们自己的 `decider` 包（eager 模式，`use_graphs=False` 避开每形状 compile
++capture）在我们两个评测集上跑 Mapika/decider-2b（2B，Qwen3.5 混合注意力底座，
+95 任务训练 + calibration-aware RL 384 步，官方温度 1.3）：
+
+| 评测集 | decider-2b | v5（我们） |
+|---|---|---|
+| 我们的 in-task（24 任务，双方多数训练过） | 0.811 / 0.453 / 0.032 | **0.863 / 0.390 / 0.034** |
+| 我们的 held-out（banking77/massive/emotion） | **0.867 / 0.420 / 0.020** | 0.581 / 1.45 / 0.068 |
+
+**关键事实（来自其 eval_results.json 的 heldout 标记）**：
+- decider-2b **训练了我们的 held-out 任务**（banking77/massive_intent/emotion
+  均 heldout=false）→ 其 0.867 是 in-task 成绩（官方同任务 0.843-0.96）
+- 我们零样本同任务 0.581 → 不可直接比较
+- **在共同训练的 in-task 任务上，v5 领先 decider-2b +5.2pt**（1.7B/24 任务
+  vs 2B/95 任务）
+
+结论：在重叠任务上我们的模型更强；他们在其 held-out（28 任务：paws/sciq/trec/
+boolq/strategyqa/quality/ade/fin_sentiment 等）上的 0.4-0.98 分数无法与我们
+现有数字对齐——**要做公平对比需构建"双方都零样本"的套件**（从他们 heldout=true
+且不在我们 24 任务中的任务里选）。
+
+## 9.23 decider-2b 同台评测（2026-09-24 完成）
+
+用他们自己的 `decider` 包（eager 模式，`use_graphs=False` 避开每形状 compile
++capture）在我们两个评测集上跑 Mapika/decider-2b（2B，Qwen3.5 混合注意力底座，
+95 任务训练 + calibration-aware RL 384 步，官方温度 1.3）：
+
+| 评测集 | decider-2b | v5（我们） |
+|---|---|---|
+| 我们的 in-task（24 任务，双方多数训练过） | 0.811 / 0.453 / 0.032 | **0.863 / 0.390 / 0.034** |
+| 我们的 held-out（banking77/massive/emotion） | **0.867 / 0.420 / 0.020** | 0.581 / 1.45 / 0.068 |
+
+**关键事实（来自其 eval_results.json 的 heldout 标记）**：
+- decider-2b **训练了我们的 held-out 任务**（banking77/massive_intent/emotion
+  均 heldout=false）→ 其 0.867 是 in-task 成绩（官方同任务 0.843-0.96）
+- 我们零样本同任务 0.581 → 不可直接比较
+- **在共同训练的 in-task 任务上，v5 领先 decider-2b +5.2pt**（1.7B/24 任务
+  vs 2B/95 任务）
+
+结论：在重叠任务上我们的模型更强；他们在其 held-out（28 任务：paws/sciq/trec/
+boolq/strategyqa/quality/ade/fin_sentiment 等）上的分数无法与我们现有数字对齐——
+**要做公平对比需构建"双方都零样本"的套件**（从他们 heldout=true 且不在我们 24
+任务中的任务里选）。
+
+## 10. 参考事实（来自公开实现）""",
+)
+open(p, "w").write(s)
+EOF
+git add -A && git commit -q -m "decider-2b head-to-head: v5 leads +5.2pt on shared in-task tasks (0.863 vs 0.811); their high held-out scores come from training on our held-out tasks" && git log --oneline | head -1
 
 - decider 路线 A 读出：prompt 到 `Answer: (`，取字母 token logits，按温度 softmax；字母从不生成，多 question 一次 forward
 - 训练期大标签集子采样到 ≤10 个候选，gold 必留、顺序 shuffle
