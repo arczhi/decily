@@ -1042,6 +1042,55 @@ xstory_cloze
 结论：ONNX 管线（含 int8）已验证可跨平台部署；学生质量需要更多数据
 （5000→20000）与更高显著性权重（1.5→3.0）再训一轮。
 
+## 9.26 纯 CPU 5 秒方案：分段整篇编码 + 句子 span pooling（2026-09-25）
+
+**实测否定了"整篇 8192 一次 forward"的假设**（Mac M5 CPU, ModernBERT-base int8,
+`onnxruntime 1.30` CPU EP）：
+
+| 输入 | 耗时 | 吞吐 |
+|---|---|---|
+| 单条 4096 token | 6.1 s | 0.46k tok/s |
+| 单条 8192 token | 75 s | 0.11k tok/s |
+| 8 × 512 token 批量 | 2.3 s | 1.8k tok/s |
+
+原因是注意力在长序列下平方增长且内存受限；ModernBERT 的 local attention 只有在
+≤512 的短序列才进入线性高效区。**结论：整篇必须切成 ~512 token 段、批量过图**，
+而不是拼成一条长序列。
+
+**新架构（学生）**：编码器（MiniLM/ModernBERT）→ 按句贪心打包 512-token 段 →
+句子 span mean-pool → LayerNorm/MLP head → 每句 logit。ONNX 单图
+（`input_ids + attention_mask + span_mask[B,S,T] → logits[B,S]`），int8 后
+MiniLM-L6 仅 **22.9MB**（旧 cross-encoder 153MB）。
+
+**训练**（`scripts/train_salience_doc.py`）：教师 probs 软标签 KL（T=2）+
+CNN/DailyMail ROUGE-1≥0.5 二分类 BCE（pos_weight 3），KD:BCE = 1:1，
+20000 步、全参、512-token 段；三个 backbone 并行训练（5090 32G 余量充足）。
+
+**教师一致性（347 条 held-out teacher probs，同评测集对比旧部署模型；
+torch best = 训练脚本评测，int8 = 量化后 ONNX）**：
+
+| 模型 | top1 | spearman | KL | ROUGE AUC | int8 大小 |
+|---|---|---|---|---|---|
+| 旧部署 cross-encoder (ModernBERT) | 0.49 | 0.587 | 0.283 | — | 153MB |
+| MiniLM-L6 整篇 | 0.50 / int8 0.48 | 0.55 / int8 0.55 | 0.40 | 0.80 | 23MB |
+| MiniLM-L12 整篇 | 0.545 / int8 0.53 | 0.609 / int8 0.60 | 0.34 | 0.83 | 34MB |
+| ModernBERT 整篇 | 0.608 / int8 0.57 | 0.680 / int8 0.68 | 0.31 | 0.84 | 152MB |
+
+**CPU 端到端（M5, int8, 8000 字）**：中文 7869 token / 16 段 →
+MiniLM-L6 **0.55s**（14k tok/s）、MiniLM-L12 **1.08s**、ModernBERT **4.9s**
+（中文 tokenizer 拆得更碎 12.3k token）；英文 8000 字 → MiniLM-L12 0.25s、
+ModernBERT 0.52s。旧 cross-encoder 同机对 140 句实测 6.2s（≈8000 字 8-11s）。
+int8 与 torch 质量差 ≤0.01（spearman），部署主选 **MiniLM-L12**（CPU 安全），
+ModernBERT 作质量选项（GPU / 短文档）。
+
+**部署**：reader 新增 `salience` 后端（`reader/salience_model.py`，
+`models_onnx/salience_*/model.int8.onnx` 自动选择），segment 打包在推理侧完成；
+app 端到端实测 8000 中文字 **1.29s**（含 HTTP 与渲染）。已知取舍：整篇模型是
+goal-free 的（教师查询固定为 "understanding this text"），reader 的 goal
+输入在该后端下禁用；如需保留需再生成 goal 条件化教师数据。
+产物：`models_onnx/salience_{minilm,minilm12,modernbert}`，
+skimmer 侧 release v1.1.0（minilm12 默认 34MB + modernbert 可选）。
+
 ## 10. 参考事实（来自公开实现）""",
 )
 open(p, "w").write(s)

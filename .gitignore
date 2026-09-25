@@ -5,6 +5,7 @@ __pycache__/
 runs/
 runs_remote/
 logs/
+models_onnx/
 data/raw/
 data/eval/
 *.pt
