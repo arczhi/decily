@@ -69,6 +69,7 @@ def main() -> None:
     ap.add_argument("--configs", nargs="+", default=None)
     ap.add_argument("--out-dir", default="data/distill")
     ap.add_argument("--batch-size", type=int, default=16)
+    ap.add_argument("--argmax-gold", action="store_true", help="set gold = teacher argmax")
     args = ap.parse_args()
 
     with open(args.config) as f:
@@ -94,6 +95,9 @@ def main() -> None:
         for ex, p in zip(examples, probs):
             q = ex.questions[0]
             assert len(p) == len(q.options), (task, len(p), len(q.options))
+            answer_ids = list(q.answer_ids)
+            if args.argmax_gold:
+                answer_ids = [q.options[int(np.argmax(p))].id]
             labeled.append(
                 DecisionExample(
                     task=ex.task,
@@ -102,7 +106,7 @@ def main() -> None:
                         type(q)(
                             text=q.text,
                             options=q.options,
-                            answer_ids=q.answer_ids,
+                            answer_ids=answer_ids,
                             type=q.type,
                             probs=[float(x) for x in p],
                         )

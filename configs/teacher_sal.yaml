@@ -1,0 +1,19 @@
+model:
+  route: cx
+  backbone: /root/models/Qwen3.5-2B-Base-Text
+  freeze_backbone: true
+  dtype: bfloat16
+  lora: true
+  lora_r: 32
+  lora_alpha: 64
+  pool: attention
+  attn_implementation: sdpa
+  grad_checkpointing: false
+data:
+  manifest:
+  - task: salience_self
+    path: data/salience_labeled/salience_self_train.jsonl
+  collator:
+    max_state_tokens: 1024
+    max_question_tokens: 96
+    max_option_tokens: 96

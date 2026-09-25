@@ -98,7 +98,13 @@ def main() -> None:
     sft_ckpt = rlcd_kwargs.pop("sft_ckpt")
     rcfg = RLCDConfig(**rlcd_kwargs)
 
-    model = build_model(cfg["model"], sft_ckpt)
+    if sft_ckpt:
+        model = build_model(cfg["model"], sft_ckpt)
+    else:
+        mc = {k: v for k, v in cfg["model"].items() if k not in ("route", "init_ckpt")}
+        from decision_model.models.cross_encoder import CrossEncoderConfig as _CEC, CrossEncoderDecisionModel as _CEM
+        model = _CEM(_CEC(**mc))
+        print("[rlcd] training from base (no sft_ckpt)", flush=True)
     if rcfg.kl_weight > 0:
         reference = build_model(cfg["model"], sft_ckpt)
     else:

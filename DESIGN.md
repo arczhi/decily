@@ -1019,6 +1019,29 @@ xstory_cloze
 - 下一步杠杆（按优先级）：① 任务 24→60-95（主杠杆）② 更强底座（Qwen3.5-2B
   或更大）③ 长上下文能力（quality 类任务我们的 256 token 截断是硬伤）
 
+
+## 9.25 部署侧：批处理 / ONNX / 显著性学生蒸馏（2026-09-25）
+
+**批处理（MLX, Qwen3-1.7B v5）**：
+- 候选批处理一批一次 forward：117ms → **75ms/句（1.55x）**；概率一致性 0.003
+- 4-bit（mlx_lm.convert）：3.2GB → **934MB**（省内存，速度持平）
+- 结论：**算力瓶颈而非带宽瓶颈**，批处理只改善利用率；提速要靠量化/小模型
+- 产物：`reader/models/v5_batched[_4bit]`（原模型 `models_mlx/v5_mlx` 未动）
+
+**ONNX 跨平台**（CPU / CUDA / DirectML）：
+- Qwen3.5 **无法导出 ONNX**（线性注意力用 `linalg_solve_triangular`，两代 exporter 均失败）
+- 学生模型（ModernBERT 标准架构）导出顺利：fp32 606MB → **int8 153MB**，数值误差 2e-5
+
+**显著性学生蒸馏**（阅读器场景）：
+- 教师 = stage1（Qwen3.5-2B/45 任务）对 5347 篇文章逐句打分（`--argmax-gold` 软标签）
+- 学生 = ModernBERT-base（150M）全参，KD(T=2, α=0.5) + 24 任务 replay + belief；
+  5000 条显著性 + 4000 步，37 分钟（0.56s/步）
+- 评测：与教师一致性 top1 **18%**、spearman **0.27**（随机 10%）→ 偏弱，待加数据
+- 端到端（Mac CPU, int8）：**131ms/句（14 句 1.9s）**；CUDA/DirectML 预期 10-30ms/句
+
+结论：ONNX 管线（含 int8）已验证可跨平台部署；学生质量需要更多数据
+（5000→20000）与更高显著性权重（1.5→3.0）再训一轮。
+
 ## 10. 参考事实（来自公开实现）""",
 )
 open(p, "w").write(s)

@@ -303,25 +303,34 @@ def sms_spam(split: str = "train", limit: int | None = None) -> Iterator[Decisio
         )
 
 
+BIAS_IN_BIOS_PROFESSIONS = [
+    "accountant", "architect", "attorney", "chiropractor", "comedian", "composer",
+    "dentist", "dietitian", "dj", "filmmaker", "interior designer", "journalist",
+    "model", "nurse", "painter", "photographer", "physician", "poet", "professor",
+    "psychologist", "rapper", "software engineer", "surgeon", "teacher",
+    "yoga teacher", "personal trainer", "paralegal", "pastor",
+]
+
+
 @register("bias_in_bios")
 def bias_in_bios(split: str = "test", limit: int | None = None) -> Iterator[DecisionExample]:
     from datasets import load_dataset
 
     ds = load_dataset("LabHC/bias_in_bios", split=split)
-    labels = list(ds.features["profession"].names)
+    labels = BIAS_IN_BIOS_PROFESSIONS
     for row in _limit(ds, limit):
         yield simple_choice(
             task="bias_in_bios",
             state=row["hard_text"],
             question_text="Which profession does this biography describe?",
             labels=labels,
-            answer=labels[row["profession"]],
+            answer=labels[int(row["profession"])],
         )
 
 
 # ---------------- tool selection ----------------
 
-_FUNC_RE = re.compile(r'"name"\s*:\s*"([a-zA-Z0-9_\-]+)"')
+_FUNC_RE = re.compile(r'"name"\s*:\s*"([^"]+)"')
 
 
 def _tool_names(text: str) -> list[str]:
@@ -339,13 +348,11 @@ def glaive_tools(split: str = "train", limit: int | None = None) -> Iterator[Dec
             break
         tools = _tool_names(row["system"])
         chat = row["chat"]
-        m = re.search(r"<functioncall>\s*(\{.*?\})\s*</functioncall>", chat, re.S)
-        if not tools or not m:
+        m = re.search(r"<functioncall>\s*(\{.*?\})\s*<\|endoftext\|>", chat, re.S)
+        nm = _FUNC_RE.search(m.group(1)) if m else None
+        if not tools or nm is None:
             continue
-        try:
-            name = json.loads(m.group(1).replace("\\'", "'"))["name"]
-        except Exception:  # noqa: BLE001
-            continue
+        name = nm.group(1)
         if name not in tools or len(tools) < 2:
             continue
         user = re.search(r"USER:\s*(.*?)(?:\n\n|$)", chat, re.S)
@@ -413,9 +420,9 @@ def toolace(split: str = "train", limit: int | None = None) -> Iterator[Decision
         call = None
         for c in convo:
             if c.get("from") == "assistant":
-                m = _FUNC_RE.search(c.get("value", ""))
+                m = re.match(r"\[?([^\[(]+?)\(", c.get("value", ""))
                 if m:
-                    call = m.group(1)
+                    call = m.group(1).strip()
                     break
         if not (user_msg and call and call in tools and len(tools) >= 2):
             continue

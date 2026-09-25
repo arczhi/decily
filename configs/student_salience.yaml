@@ -1,0 +1,130 @@
+seed: 0
+model:
+  route: cx
+  backbone: answerdotai/ModernBERT-base
+  freeze_backbone: false
+  dtype: float32
+  amp_dtype: bfloat16
+  lora: false
+  pool: attention
+  dropout: 0.0
+  label_smoothing: 0.05
+  attn_implementation: sdpa
+  grad_checkpointing: true
+data:
+  collator:
+    max_state_tokens: 1024
+    max_question_tokens: 96
+    max_option_tokens: 64
+  min_options: 2
+  max_options: 16
+  belief_path: data/raw/belief_v2_train.jsonl
+  belief_eval_path: data/raw/belief_v2_eval.jsonl
+  eval_path: data/eval/stage2_intask.jsonl
+  heldout_path: data/eval/stage1_heldout.jsonl
+  manifest:
+  - task: salience_self
+    path: data/raw/salience_train.jsonl
+    weight: 1.5
+  - task: sst2
+    path: data/distill5/sst2_train.jsonl
+    weight: 1.0
+  - task: ag_news
+    path: data/distill5/ag_news_train.jsonl
+    weight: 1.0
+  - task: mnli
+    path: data/distill5/mnli_train.jsonl
+    weight: 1.0
+  - task: arc_easy
+    path: data/distill5/arc_easy_train.jsonl
+    weight: 1.0
+  - task: amazon_polarity
+    path: data/distill5/amazon_polarity_train.jsonl
+    weight: 1.0
+  - task: imdb
+    path: data/distill5/imdb_train.jsonl
+    weight: 1.0
+  - task: tweet_sentiment
+    path: data/distill5/tweet_sentiment_train.jsonl
+    weight: 1.0
+  - task: toxic_conversations
+    path: data/distill5/toxic_conversations_train.jsonl
+    weight: 1.0
+  - task: counterfactual
+    path: data/distill5/counterfactual_train.jsonl
+    weight: 1.0
+  - task: tweet_topic
+    path: data/distill5/tweet_topic_train.jsonl
+    weight: 1.0
+  - task: poem_sentiment
+    path: data/distill5/poem_sentiment_train.jsonl
+    weight: 1.0
+  - task: dbpedia
+    path: data/distill5/dbpedia_train.jsonl
+    weight: 1.0
+  - task: rte
+    path: data/distill5/rte_train.jsonl
+    weight: 1.0
+  - task: qqp
+    path: data/distill5/qqp_train.jsonl
+    weight: 1.0
+  - task: mrpc
+    path: data/distill5/mrpc_train.jsonl
+    weight: 1.0
+  - task: arc_challenge
+    path: data/distill5/arc_challenge_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_world_history
+    path: data/distill5/mmlu_high_school_world_history_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_biology
+    path: data/distill5/mmlu_high_school_biology_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_physics
+    path: data/distill5/mmlu_high_school_physics_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_government_and_politics
+    path: data/distill5/mmlu_high_school_government_and_politics_train.jsonl
+    weight: 1.0
+  - task: mmlu_college_computer_science
+    path: data/distill5/mmlu_college_computer_science_train.jsonl
+    weight: 1.0
+  - task: mmlu_moral_scenarios
+    path: data/distill5/mmlu_moral_scenarios_train.jsonl
+    weight: 1.0
+  - task: mmlu_professional_law
+    path: data/distill5/mmlu_professional_law_train.jsonl
+    weight: 1.0
+  - task: mmlu_world_religions
+    path: data/distill5/mmlu_world_religions_train.jsonl
+    weight: 1.0
+rlcd:
+  steps: 4000
+  batch_size: 8
+  grad_accum: 2
+  lr: 3.0e-05
+  weight_decay: 0.01
+  grad_clip: 1.0
+  warmup_steps: 200
+  scheduler: cosine
+  kd_temperature: 2.0
+  kd_alpha: 0.5
+  belief_weight: 1.0
+  action_weight: 0.0
+  ce_weight: 1.0
+  spherical_weight: 0.75
+  kl_weight: 0.0
+  belief_ratio: 0.2
+  abstention_ratio: 0.0
+  distill_ratio: 0.0
+  log_every: 50
+  eval_every: 2000
+  eval_batch_size: 8
+  eval_max_batches: 40
+  out_dir: runs/student_salience
+  seed: 0
+  device: cuda
+  save_trainable_only: true
+  save_dtype: bfloat16
+  optim: adamw8bit
+  sft_ckpt: ''

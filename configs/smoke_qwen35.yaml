@@ -1,0 +1,191 @@
+seed: 0
+model:
+  route: cx
+  backbone: /root/models/Qwen3.5-2B-Base-Text
+  freeze_backbone: true
+  dtype: bfloat16
+  amp_dtype: bfloat16
+  lora: true
+  lora_r: 32
+  lora_alpha: 64
+  pool: attention
+  dropout: 0.0
+  label_smoothing: 0.05
+  attn_implementation: sdpa
+  grad_checkpointing: true
+data:
+  collator:
+    max_state_tokens: 256
+    max_question_tokens: 96
+    max_option_tokens: 64
+  min_options: 2
+  max_options: 16
+  belief_path: data/raw/belief_v2_train.jsonl
+  belief_eval_path: data/raw/belief_v2_eval.jsonl
+  eval_path: data/eval/stage1_v2_intask.jsonl
+  heldout_path: data/eval/stage1_heldout.jsonl
+  manifest:
+  - task: sst2
+    path: data/raw/sst2_train.jsonl
+    weight: 1.0
+  - task: ag_news
+    path: data/raw/ag_news_train.jsonl
+    weight: 1.0
+  - task: mnli
+    path: data/raw/mnli_train.jsonl
+    weight: 1.0
+  - task: arc_easy
+    path: data/raw/arc_easy_train.jsonl
+    weight: 1.0
+  - task: amazon_polarity
+    path: data/raw/amazon_polarity_train.jsonl
+    weight: 1.0
+  - task: imdb
+    path: data/raw/imdb_train.jsonl
+    weight: 1.0
+  - task: tweet_sentiment
+    path: data/raw/tweet_sentiment_train.jsonl
+    weight: 1.0
+  - task: toxic_conversations
+    path: data/raw/toxic_conversations_train.jsonl
+    weight: 1.0
+  - task: counterfactual
+    path: data/raw/counterfactual_train.jsonl
+    weight: 1.0
+  - task: tweet_topic
+    path: data/raw/tweet_topic_train.jsonl
+    weight: 1.0
+  - task: poem_sentiment
+    path: data/raw/poem_sentiment_train.jsonl
+    weight: 1.0
+  - task: dbpedia
+    path: data/raw/dbpedia_train.jsonl
+    weight: 1.0
+  - task: rte
+    path: data/raw/rte_train.jsonl
+    weight: 1.0
+  - task: qqp
+    path: data/raw/qqp_train.jsonl
+    weight: 1.0
+  - task: mrpc
+    path: data/raw/mrpc_train.jsonl
+    weight: 1.0
+  - task: arc_challenge
+    path: data/raw/arc_challenge_train.jsonl
+    weight: 1.0
+  - task: mmlu_high_school_world_history
+    path: data/raw/mmlu_high_school_world_history_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_biology
+    path: data/raw/mmlu_high_school_biology_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_physics
+    path: data/raw/mmlu_high_school_physics_train.jsonl
+    weight: 0.5
+  - task: mmlu_high_school_government_and_politics
+    path: data/raw/mmlu_high_school_government_and_politics_train.jsonl
+    weight: 0.5
+  - task: mmlu_college_computer_science
+    path: data/raw/mmlu_college_computer_science_train.jsonl
+    weight: 0.5
+  - task: mmlu_moral_scenarios
+    path: data/raw/mmlu_moral_scenarios_train.jsonl
+    weight: 0.5
+  - task: mmlu_professional_law
+    path: data/raw/mmlu_professional_law_train.jsonl
+    weight: 0.5
+  - task: mmlu_world_religions
+    path: data/raw/mmlu_world_religions_train.jsonl
+    weight: 0.5
+  - task: hellaswag
+    path: data/raw/hellaswag_train.jsonl
+    weight: 1.0
+  - task: openbookqa
+    path: data/raw/openbookqa_train.jsonl
+    weight: 1.0
+  - task: commonsense_qa
+    path: data/raw/commonsense_qa_train.jsonl
+    weight: 1.0
+  - task: qasc
+    path: data/raw/qasc_train.jsonl
+    weight: 1.0
+  - task: winogrande
+    path: data/raw/winogrande_train.jsonl
+    weight: 1.0
+  - task: boolq
+    path: data/raw/boolq_train.jsonl
+    weight: 1.0
+  - task: cola
+    path: data/raw/cola_train.jsonl
+    weight: 1.0
+  - task: qnli
+    path: data/raw/qnli_train.jsonl
+    weight: 1.0
+  - task: medmcqa
+    path: data/raw/medmcqa_train.jsonl
+    weight: 1.0
+  - task: medqa
+    path: data/raw/medqa_train.jsonl
+    weight: 1.0
+  - task: race
+    path: data/raw/race_train.jsonl
+    weight: 1.0
+  - task: wiki_qa
+    path: data/raw/wiki_qa_train.jsonl
+    weight: 1.0
+  - task: yelp_polarity
+    path: data/raw/yelp_polarity_train.jsonl
+    weight: 1.0
+  - task: sst5
+    path: data/raw/sst5_train.jsonl
+    weight: 1.0
+  - task: newsgroups20
+    path: data/raw/newsgroups20_train.jsonl
+    weight: 1.0
+  - task: civil_comments
+    path: data/raw/civil_comments_train.jsonl
+    weight: 1.0
+  - task: sms_spam
+    path: data/raw/sms_spam_train.jsonl
+    weight: 1.0
+  - task: bias_in_bios
+    path: data/raw/bias_in_bios_train.jsonl
+    weight: 1.0
+  - task: glaive_tools
+    path: data/raw/glaive_tools_train.jsonl
+    weight: 1.0
+  - task: hermes_tools
+    path: data/raw/hermes_tools_train.jsonl
+    weight: 1.0
+  - task: toolace
+    path: data/raw/toolace_train.jsonl
+    weight: 1.0
+rlcd:
+  steps: 30
+  batch_size: 4
+  grad_accum: 4
+  lr: 0.0002
+  weight_decay: 0.01
+  grad_clip: 1.0
+  warmup_steps: 10
+  scheduler: cosine
+  kd_temperature: 0.0
+  kd_alpha: 0.5
+  belief_weight: 1.0
+  action_weight: 0.0
+  ce_weight: 1.0
+  spherical_weight: 0.75
+  kl_weight: 0.0
+  belief_ratio: 0.15
+  abstention_ratio: 0.0
+  distill_ratio: 0.0
+  log_every: 10
+  eval_every: 0
+  eval_batch_size: 8
+  eval_max_batches: 60
+  out_dir: runs/smoke_qwen35
+  seed: 0
+  device: cuda
+  save_trainable_only: true
+  save_dtype: bfloat16
+  sft_ckpt: ''

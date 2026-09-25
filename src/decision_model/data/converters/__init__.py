@@ -1,4 +1,5 @@
 from . import fair_suite  # noqa: F401
+from . import salience  # noqa: F401
 from . import stage1_tasks  # noqa: F401
 from .extra_tasks import MMLU_SUBJECTS  # noqa: F401
 from .goemotions import EMOTIONS  # noqa: F401
