@@ -44,7 +44,7 @@ details in TRAIN-REPORT.md §9.23–§9.24):
 | `Decily-1.7B` | PyTorch bf16 safetensors | ~3.4 GB | server / GPU |
 | `Decily-MLX` | MLX bf16 safetensors | ~3.4 GB | Apple Silicon |
 | `Decily-MLX-4bit` | MLX 4-bit (group 64) | **968 MB** | on-device / low memory |
-| `Decily-ONNX-int8` | ONNX int8 | ~1.7 GB (in preparation) | pure CPU / Windows / edge |
+| `Decily-ONNX-int8` | ONNX int8 (single file) | 1.66 GB | pure CPU / Windows / edge |
 
 - Candidate sets are scored in one batched forward pass (~75 ms per sentence
   on M-series chips with the 4-bit build); 4-bit matches bf16 probabilities to

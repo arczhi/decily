@@ -307,9 +307,17 @@ mlx_lm.convert --hf-path models_mlx/v5_mlx -q --q-bits 4 --mlx-path models/v5_ba
 ```
 
 - batched reader tower (state+question+candidate packing): `scripts/prep_reader_batched_model.py`
-- ONNX: v5 uses the standard Qwen3 architecture and is exportable; the ONNX int8
-  artifact is planned (TRAIN-REPORT §9.25 documents what fails for Qwen3.5's
-  linear attention, which is why the teacher cannot be exported)
+- ONNX int8 (CPU / edge): `scripts/export_decision_onnx.py` exports the
+  scoring path (`input_ids + attention_mask -> logits`, one row per candidate)
+  and dynamically quantizes it. No base-model download is needed (the backbone
+  is built from config and all parameters are loaded from the bundle, strict).
+  Verified: fp32 max|diff| 2.5e-05 vs PyTorch; int8 top-1 agreement 1.000.
+
+  ```bash
+  PYTHONPATH=src python scripts/export_decision_onnx.py \
+      --bundle models_hf/Decily-1.7B --out models_hf/Decily-ONNX-int8 \
+      --parity data/fair_suite/fair_suite.jsonl
+  ```
 - verification: after MLX conversion, cross-check logits on a fixed sample
   (parity table in TRAIN-REPORT §9.22)
 
