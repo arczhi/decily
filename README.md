@@ -9,6 +9,8 @@
 > [TRAINING.md](TRAINING.md) · Experiment log: [TRAIN-REPORT.md](TRAIN-REPORT.md)
 > · Hugging Face model card: [MODEL_CARD.md](MODEL_CARD.md)
 
+![Decily-1.7B — calibrated candidate decision model](assets/decily-1.7b-banner.png)
+
 ```python
 Decily.decide(
     state="Our app crashes on startup after the latest update.",

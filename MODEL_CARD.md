@@ -20,6 +20,8 @@ tags:
 candidates. It does not generate text. Decily is built for decisions where you
 want a probability you can threshold, not a sentence you have to parse.
 
+![Decily-1.7B — calibrated candidate decision model](assets/decily-1.7b-banner.png)
+
 ```python
 Decily.decide(
     state="Our app crashes on startup after the latest update.",
