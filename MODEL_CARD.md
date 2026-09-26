@@ -36,10 +36,10 @@ different containers.
 
 | Variant | Format | Size | Target |
 |---|---|---|---|
-| **Decily-1.7B** | PyTorch bf16 safetensors + `config.json` | ~3.4 GB | server / GPU |
-| **Decily-MLX** | MLX bf16 safetensors | ~3.4 GB | Apple Silicon |
-| **Decily-MLX-4bit** | MLX 4-bit (group-64 affine) | 968 MB | on-device / low memory |
-| **Decily-ONNX-int8** | ONNX int8 (single file) | 1.66 GB | CPU / Windows / edge |
+| **[Decily-1.7B](https://huggingface.co/alexzhang0118/Decily-1.7B)** | PyTorch bf16 safetensors + `config.json` | ~3.4 GB | server / GPU |
+| **[Decily-MLX](https://huggingface.co/alexzhang0118/Decily-MLX)** | MLX bf16 safetensors | ~3.4 GB | Apple Silicon |
+| **[Decily-MLX-4bit](https://huggingface.co/alexzhang0118/Decily-MLX-4bit)** | MLX 4-bit (group-64 affine) | 968 MB | on-device / low memory |
+| **[Decily-ONNX-int8](https://huggingface.co/alexzhang0118/Decily-ONNX-int8)** | ONNX int8 (single file) | 1.66 GB | CPU / Windows / edge |
 
 ## Model details
 
