@@ -14,7 +14,7 @@ rsync -az --delete \
   --exclude '__pycache__' \
   "$SRC/scripts/" "$HOST:$DEST/scripts/"
 rsync -az "$SRC/configs/" "$HOST:$DEST/configs/"
-for f in pyproject.toml AGENTS.md DESIGN.md README.md; do
+for f in pyproject.toml AGENTS.md DESIGN.md TRAINING.md TRAIN-REPORT.md MODEL_CARD.md README.md; do
   [ -f "$SRC/$f" ] && rsync -az "$SRC/$f" "$HOST:$DEST/"
 done
 echo "[sync] code -> $HOST:$DEST (data/runs/models untouched)"

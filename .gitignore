@@ -6,8 +6,13 @@ runs/
 runs_remote/
 logs/
 models_onnx/
+models_mlx/
+models_hf/
+models/
 data/raw/
 data/eval/
+data/distill5/
 *.pt
 *.log
+session-*.md
 .DS_Store
