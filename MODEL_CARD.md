@@ -64,7 +64,8 @@ different containers.
 
 ## Training summary
 
-Full, reproducible recipe: `TRAINING.md` in the training repository
+Full, reproducible recipe: [TRAINING.md](https://github.com/arczhi/decily/blob/main/TRAINING.md)
+in the training repository [arczhi/decily](https://github.com/arczhi/decily)
 (design rationale in `DESIGN.md`, all experiments and ablations in
 `TRAIN-REPORT.md`).
 
@@ -184,7 +185,7 @@ model was trained more than once per stage.
 
 - Backbone: [Qwen3-1.7B-Base](https://huggingface.co/Qwen/Qwen3-1.7B-Base) (Apache-2.0).
 - The Route B formulation and the calibration/abstention pipeline build on the
-  decision-model line of work; the external baseline in the tables is
+  Decily line of work; the external baseline in the tables is
   [Mapika/decider](https://github.com/Mapika/decider).
 - If you use Decily, please cite this model card and link the training
   repository (`TRAINING.md`).

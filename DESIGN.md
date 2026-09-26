@@ -434,7 +434,7 @@ Response: { questions: [ {distribution: {option_id: prob}, } ] }
 ## 7. Repository Structure
 
 ```
-decision-model/
+decily/
 ├── DESIGN.md                  # this document
 ├── README.md
 ├── pyproject.toml
