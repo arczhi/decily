@@ -22,10 +22,11 @@ want a probability you can threshold, not a sentence you have to parse.
 
 ```python
 Decily.decide(
-    state="The invoice was paid twice; the customer asks for a refund.",
+    state="Our app crashes on startup after the latest update.",
     question="What is the customer's intent?",
-    options=["billing", "technical", "shipping", "returns"],
-)  # -> {"billing": 0.62, "returns": 0.29, "shipping": 0.07, "technical": 0.02}
+    options=["technical", "billing", "shipping", "returns"],
+)  # -> {"technical": 0.9999, "billing": 0.0001, "returns": 0.0, "shipping": 0.0}
+# measured with the released weights (bf16, T=0.45)
 ```
 
 ## Model family
